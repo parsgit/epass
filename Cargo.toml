@@ -8,6 +8,6 @@ edition = "2021"
 [dependencies]
 aes-gcm = "0.10.2"
 dirs = "5.0.1"
-termion = "1.5.6"
+crossterm = "0.26.1"
 colored = "2.0.0"
 rpassword = "7.2.0"

@@ -3,7 +3,9 @@ use std::io::{stdin, stdout};
 // use std::io::stdout;
 use rpassword;
 use std::io::Write;
-use termion::{clear, cursor};
+//use termion::{clear, cursor};
+use crossterm::{terminal::{Clear, ClearType}, ExecutableCommand};
+use crossterm::cursor::{MoveTo, position};
 
 pub struct Password {}
 
@@ -21,7 +23,7 @@ impl Password {
         return result;
     }
 
-    pub fn main_menu(auto_clear:bool) {
+    pub fn main_menu(auto_clear: bool) {
         if auto_clear {
             Password::tm_clear();
         }
@@ -60,8 +62,12 @@ impl Password {
     }
 
     pub fn tm_clear() {
-        print!("{}{}", clear::All, cursor::Goto(1, 1));
-        stdout().flush().unwrap();
+        // print!("{}{}", clear::All, cursor::Goto(1, 1));
+        // stdout().flush().unwrap();
+
+        let mut stdout = stdout();
+        stdout.execute(MoveTo(0, 0)).unwrap();
+        stdout.execute(Clear(ClearType::All)).unwrap();
     }
 
     fn manage_menu(number: i8) {
@@ -91,13 +97,11 @@ impl Password {
 
             let password2 = rpassword::prompt_password("Repeat the password: ").unwrap();
 
-
-            if(password.trim() == password2.trim()){
+            if (password.trim() == password2.trim()) {
                 Password::tm_clear();
-                println!("{}\n","✅ Password saved".green().bold());
+                println!("{}\n", "✅ Password saved".green().bold());
                 Password::main_menu(false);
             }
-            
         }
     }
 }
