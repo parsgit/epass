@@ -13,6 +13,7 @@ fn main() {
 
     Password::init_config();
     Password::check_current_pass();
+    Password::init_save_keys_path();
 
 
 
