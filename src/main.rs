@@ -9,14 +9,24 @@ use password::Password;
 
 fn main() {
 
-    Password::tm_clear();
-    println!("{}", "About:".bold());
-    println!("{}","epass is a simple and secure program for saving, viewing, and managing passwords locally and offline");
-    println!("repo: {}","https://github.com/parsgit/epass");
-    println!("version: {}\n\n","1.0.0".bold());
+    // Password::get_path_default_documents();
 
-    let get_result = Password::main_menu(false);
+    Password::init_config();
+    Password::check_current_pass();
+
+
+
+    let get_result = Password::main_menu(true);
     
+
+
+
+
+
+
+
+
+
     // Action::manage_menu(get_result);
 
     // let chose_menu = Action::get_main_menu_action();

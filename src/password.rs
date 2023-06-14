@@ -1,11 +1,20 @@
 use colored::*;
-use std::io::{stdin, stdout};
+use std::{
+    fs,
+    fs::File,
+    io::{stdin, stdout},
+    path::{Path, PathBuf},
+};
 // use std::io::stdout;
 use rpassword;
 use std::io::Write;
 //use termion::{clear, cursor};
-use crossterm::{terminal::{Clear, ClearType}, ExecutableCommand};
-use crossterm::cursor::{MoveTo, position};
+use crossterm::cursor::{position, MoveTo};
+use crossterm::{
+    terminal::{Clear, ClearType},
+    ExecutableCommand,
+};
+
 
 pub struct Password {}
 
@@ -62,9 +71,6 @@ impl Password {
     }
 
     pub fn tm_clear() {
-        // print!("{}{}", clear::All, cursor::Goto(1, 1));
-        // stdout().flush().unwrap();
-
         let mut stdout = stdout();
         stdout.execute(MoveTo(0, 0)).unwrap();
         stdout.execute(Clear(ClearType::All)).unwrap();
@@ -74,10 +80,126 @@ impl Password {
         if number == 2 {
             Password::create_new_password();
         }
-        // match number {
-        //     1=>{ Password::create_new_password() }
-        //     Err(_)=>{panic!("sss")}
-        // }
+    }
+
+    fn error_access_message() -> &'static str {
+        "Access Denied: Unable to create file or directory."
+    }
+
+    fn get_path_config() -> PathBuf {
+        let config_path = dirs::config_dir().expect(Password::error_access_message());
+        return config_path.join("epass");
+    }
+
+    fn get_path_config_keys() -> PathBuf {
+         Password::get_path_config().join("storage_kyes_path")
+    }
+
+
+    pub fn get_path_default_documents() -> PathBuf {
+        let documents = dirs::home_dir().unwrap().join("Documents");
+        return documents;
+    }
+
+    // pub fn get_path_keys()->PathBuf{
+    //     Password::get
+    // }
+
+
+    
+
+    pub fn config_the_storage_keys() {
+        let mut first = true;
+
+        loop {
+
+            if first == false{
+                Password::tm_clear();
+                println!("{}","Invalid input, please select 1 or 2".red());
+            }
+            first =false;
+
+
+            println!("Select the password storage location (all information will be stored encrypted)");
+            println!(" {}","1. Set default save location to Documents/Keys".bold());
+            println!(" {}","2. Set custom save location".bold());
+            print!("{}","Choose an option: ".blue());
+            stdout().flush().unwrap();
+
+            let mut choice = String::new();
+            stdin().read_line(&mut choice).expect("Failed to read line");
+
+            match choice.trim().parse::<i8>() {
+                Ok(num) => {
+                    if num == 1 {
+
+                        let keys_path = Password::get_path_default_documents().join("Keys");
+                        let keys_path_config_file_path = Password::get_path_config_keys();
+
+                        let mut file = File::create(keys_path_config_file_path).unwrap();
+                        file.write_all(keys_path.as_path().display().to_string().as_bytes()).unwrap();
+                        
+                        break;
+                    }
+                    else if num == 2{
+
+                    }
+                    else{
+                        println!("{}","Invalid input, please select 1 or 2".red());
+                    }
+                }
+                Err(_) => {
+                    println!("{}","Invalid input, please select 1 or 2".red());
+                },
+            }
+
+
+        }
+    }
+
+    pub fn init_config() {
+        let config_epass = Password::get_path_config();
+
+        let path = Path::new(config_epass.as_path());
+        let display = path.display();
+
+        let error = format!("{}:{}", Password::error_access_message(), display);
+        fs::create_dir_all(config_epass).expect(error.trim());
+    }
+
+    fn init_save_keys_path() {
+        let mut config_path = dirs::document_dir().expect(Password::error_access_message());
+        let config_epass = config_path.join("Keys");
+        fs::create_dir(config_epass).expect(Password::error_access_message());
+    }
+
+    pub fn check_current_pass() {
+        let storage_keys_path = Password::get_path_config_keys();
+        let hash_file = Path::new(storage_keys_path.as_path());
+
+        if (hash_file.exists() == false) {
+
+            Password::tm_clear();
+            println!("{}", "About:".bold());
+            println!("{}","epass is a simple and secure program for saving, viewing, and managing passwords locally and offline");
+            println!("repo: {}","https://github.com/parsgit/epass");
+            println!("version: {}\n\n","1.0.0".bold());
+
+
+            Password::config_the_storage_keys();
+            // print!("{}", "Enter your password: ".yellow());
+            // stdout().flush().unwrap();
+
+            // let password = Password::get_input("");
+
+            // let password2 = rpassword::prompt_password("Repeat the password: ").unwrap();
+
+            // if (password.trim() == password2.trim()) {
+            //     Password::tm_clear();
+            //     println!("{}\n", "✅ Password saved".green().bold());
+            //     Password::main_menu(false);
+            // }
+        }
     }
 
     fn create_new_password() {
@@ -99,6 +221,9 @@ impl Password {
 
             if (password.trim() == password2.trim()) {
                 Password::tm_clear();
+
+                File::create(Password::get)
+
                 println!("{}\n", "✅ Password saved".green().bold());
                 Password::main_menu(false);
             }
