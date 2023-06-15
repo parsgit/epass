@@ -1,3 +1,4 @@
+use aes_gcm::aes::cipher::typenum::Integer;
 use colored::*;
 use std::{
     fs,
@@ -14,8 +15,14 @@ use crossterm::{
     terminal::{Clear, ClearType},
     ExecutableCommand,
 };
+// use tabled::tables::IterTable;
+// use prettytable::{Table, Row, Cell};
 
-pub struct Password {}
+pub struct Password {
+    name: String,
+    content: String,
+    index: u16,
+}
 
 impl Password {
     pub fn get_input(mut err_message: &str) -> String {
@@ -36,10 +43,10 @@ impl Password {
             Password::tm_clear();
         }
         loop {
-            println!("{}","1) View Password List".bold());
-            println!("{}","2) Save New Password".bold());
-            println!("{}","3) Edit Password".bold());
-            println!("{}","4) Delete Password".bold());
+            println!("{}", "1) View Password List".bold());
+            println!("{}", "2) Save New Password".bold());
+            println!("{}", "3) Edit Password".bold());
+            println!("{}", "4) Delete Password".bold());
             println!("5) Set Password Storage");
             println!("6) Exit");
             print!("\n{}", "Please select an option: ".cyan());
@@ -70,6 +77,63 @@ impl Password {
         }
     }
 
+    pub fn getKyesFilesList() -> Vec<Password> {
+        let path = Password::get_path_keys();
+        let mut files: Vec<Password> = Vec::new();
+
+        if let Ok(entries) = fs::read_dir(path) {
+        let mut idx:u16 = 0;
+
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    if path.is_file() {
+                        let file_name = path.file_name().unwrap_or_default().to_str().unwrap();
+
+                        idx+=1;
+                        files.push(Password {
+                            name: file_name.to_string(),
+                            index: idx,
+                            content: "".to_string(),
+                        });
+                    }
+                }
+            }
+        }
+
+        return files;
+    }
+
+    pub fn show_list_of_passwords() {
+        Password::tm_clear();
+
+        println!("Password list: \n");
+        let list = Password::getKyesFilesList();
+
+        let mut idx = 1;
+
+        for file in list.iter() {
+            // println!("{}: {}",file.index ,file.name );
+
+            print!(" {}.", file.index.to_string().yellow());
+            print!("{}     ", file.name.bold());
+            if idx % 3 == 0 {
+                println!();
+            }
+            idx += 1;
+        }
+
+        if (idx - 1) % 3 != 0 {
+            println!();
+        }
+
+        print!("Please send password number: ");
+        stdout().flush().unwrap();
+
+        Password::get_input("");
+
+        // println!("List {:?}", list);
+    }
     pub fn tm_clear() {
         let mut stdout = stdout();
         stdout.execute(MoveTo(0, 0)).unwrap();
@@ -77,13 +141,14 @@ impl Password {
     }
 
     fn manage_menu(number: i8) {
-        if number == 2 {
+        if number == 1 {
+            Password::show_list_of_passwords();
+        } else if number == 2 {
             Password::create_new_password();
         } else if (number == 5) {
             Password::config_the_storage_keys();
-        }
-        else if (number == 6) {
-            println!("{}","Goodbay.".bold());
+        } else if (number == 6) {
+            println!("{}", "Goodbay.".bold());
             std::process::exit(0);
         }
     }
@@ -228,7 +293,6 @@ impl Password {
                 file.write_all(password.as_bytes()).unwrap();
 
                 println!("{}\n", "✅ Password saved".green().bold());
-                Password::main_menu(false);
             }
         }
     }

@@ -17,7 +17,7 @@ fn main() {
 
 
 
-    let get_result = Password::main_menu(true);
+    Password::main_menu(true);
     
 
 
