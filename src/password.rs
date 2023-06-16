@@ -130,10 +130,37 @@ impl Password {
         print!("Please send password number: ");
         stdout().flush().unwrap();
 
-        Password::get_input("");
+        let get_index = Password::get_input("");
+
+
+        let password = Password::find_password_by_index(get_index.trim().parse::<u16>().unwrap(), &list);
+        println!("Select : {}", password.unwrap().name);
 
         // println!("List {:?}", list);
     }
+
+
+
+    // fn find_password(index: u16, passwords: &[Password]) -> Option<&Password> {
+    //     for password in passwords.iter() {
+    //         if password.index == index {
+    //             return Some(password);
+    //         }
+    //     }
+    //     None
+    // }
+    
+    pub fn find_password_by_index(index: u16, list: &Vec<Password>) -> Option<&Password> {
+        for pass in list.iter() {
+            if (pass.index == index) {
+                return Some(pass);
+            }
+        }
+
+        None
+}
+
+
     pub fn tm_clear() {
         let mut stdout = stdout();
         stdout.execute(MoveTo(0, 0)).unwrap();
