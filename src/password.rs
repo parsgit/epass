@@ -1,4 +1,3 @@
-use aes_gcm::aes::cipher::typenum::Integer;
 use colored::*;
 use std::{
     fs,
@@ -15,8 +14,25 @@ use crossterm::{
     terminal::{Clear, ClearType},
     ExecutableCommand,
 };
-// use tabled::tables::IterTable;
-// use prettytable::{Table, Row, Cell};
+use sha2::{Digest, Sha256};
+
+// use aes_gcm::{
+//     aead::{Aead, AeadCore, KeyInit, OsRng},
+//     Aes256Gcm,
+//     Key, // Or `Aes128Gcm`
+//     Nonce,
+// };
+
+use aes_gcm::{
+    aead::{Aead, AeadCore, KeyInit, OsRng},
+    Aes256Gcm, Nonce, Key,
+};
+
+use hex;
+// use aes_gcm::{Aead, Aes256Gcm, Key, Nonce};
+// use rand::rngs::OsRng;
+// use rand::RngCore;
+// use std::convert::TryInto;
 
 pub struct Password {
     name: String,
@@ -82,7 +98,7 @@ impl Password {
         let mut files: Vec<Password> = Vec::new();
 
         if let Ok(entries) = fs::read_dir(path) {
-        let mut idx:u16 = 0;
+            let mut idx: u16 = 0;
 
             for entry in entries {
                 if let Ok(entry) = entry {
@@ -90,7 +106,7 @@ impl Password {
                     if path.is_file() {
                         let file_name = path.file_name().unwrap_or_default().to_str().unwrap();
 
-                        idx+=1;
+                        idx += 1;
                         files.push(Password {
                             name: file_name.to_string(),
                             index: idx,
@@ -104,7 +120,7 @@ impl Password {
         return files;
     }
 
-    pub fn show_list_of_passwords() {
+    pub fn show_list_of_passwords() -> Vec<Password> {
         Password::tm_clear();
 
         println!("Password list: \n");
@@ -127,19 +143,25 @@ impl Password {
             println!();
         }
 
+        list
+        // println!("List {:?}", list);
+    }
+
+    pub fn get_password_index_and_show_content(list: &Vec<Password>) {
         print!("Please send password number: ");
         stdout().flush().unwrap();
 
         let get_index = Password::get_input("");
 
+        let mut select_pass_index = 0;
 
-        let password = Password::find_password_by_index(get_index.trim().parse::<u16>().unwrap(), &list);
-        println!("Select : {}", password.unwrap().name);
+        match get_index.trim().parse::<u16>() {
+            Ok(number) => select_pass_index = number,
+            Err(_) => eprintln!("Error: The input is not a valid integer"),
+        }
 
-        // println!("List {:?}", list);
+        let password = Password::find_password_by_index(select_pass_index, &list);
     }
-
-
 
     // fn find_password(index: u16, passwords: &[Password]) -> Option<&Password> {
     //     for password in passwords.iter() {
@@ -149,7 +171,7 @@ impl Password {
     //     }
     //     None
     // }
-    
+
     pub fn find_password_by_index(index: u16, list: &Vec<Password>) -> Option<&Password> {
         for pass in list.iter() {
             if (pass.index == index) {
@@ -158,8 +180,7 @@ impl Password {
         }
 
         None
-}
-
+    }
 
     pub fn tm_clear() {
         let mut stdout = stdout();
@@ -169,7 +190,8 @@ impl Password {
 
     fn manage_menu(number: i8) {
         if number == 1 {
-            Password::show_list_of_passwords();
+            let list = Password::show_list_of_passwords();
+            Password::get_password_index_and_show_content(&list);
         } else if number == 2 {
             Password::create_new_password();
         } else if (number == 5) {
@@ -317,10 +339,106 @@ impl Password {
                 Password::tm_clear();
 
                 let mut file = File::create(Password::get_path_keys().join(name.trim())).unwrap();
-                file.write_all(password.as_bytes()).unwrap();
+
+
+                let key: &[u8; 32] = &Password::text_to_bytes("hello ben");
+                let key: &Key<Aes256Gcm> = key.into();
+                let cipher = Aes256Gcm::new(&key);
+                let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // 96-bits; unique per message
+                let ciphertext = cipher.encrypt(&nonce, b"plaintext message".as_ref()).unwrap();
+
+                file.write_all(&ciphertext).unwrap();
 
                 println!("{}\n", "✅ Password saved".green().bold());
             }
         }
+    }
+
+    // pub fn encrypt_data() -> String {
+    //     // The encryption key can be generated randomly:
+    //     // let key = Aes256Gcm::generate_key("hello");
+
+    //     // println!("key:{:?}", b"hello");
+    //     // let key: &[u8; 32] = &[42; 32];
+    //     // let key: &Key<Aes256Gcm> = b"hello".into();
+    //     // // Transformed from a byte array:
+    //     // let key: &[u8; 32] = &[42; 32];
+    //     // let key: &Key<Aes256Gcm> = key.into();
+    //     // println!("key:{:?}", key);
+
+    //     // // Note that you can get byte array from slice using the `TryInto` trait:
+    //     // let key: &[u8] = &[42; 32];
+    //     // let key: [u8; 32] = key.try_into().unwrap();
+
+    //     // Alternatively, the key can be transformed directly from a byte slice
+    //     // (panicks on length mismatch):
+    //     // let key = Key::<Aes256Gcm>::from_slice(b"hello");
+
+    //     // let cipher = Aes256Gcm::new(&key);
+    //     // let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // 96-bits; unique per message
+    //     // let ciphertext = cipher.encrypt(&nonce, b"plaintext message".as_ref()).unwrap();
+    //     // let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).unwrap();
+
+    //     // println!("test:{:?}",plaintext);
+    //     // assert_eq!(&plaintext, b"plaintext message");
+
+    //     let my_key: &[u8; 32] = b"My super secret key       ";
+    //     let key: &Key<Aes256Gcm> = my_key.into();
+
+    //     return "".to_string();
+    // }
+
+
+    // pub fn decode(key: &str, ciphertext: &str) -> Result<String, &'static str> {
+    //     // let key_arr = match hex::decode(key) {
+    //     //     Ok(arr) => arr,
+    //     //     Err(_) => return Err("Invalid hex key"),
+    //     // };
+    
+    //     // let k: &[u8; 32] = match key_arr.as_slice().try_into() {
+    //     //     Ok(k) => k,
+    //     //     Err(_) => return Err("Invalid key length"),
+    //     // };
+    
+    //     // let cipher = Aes256Gcm::new(&Key::<Aes256Gcm>::from_slice(k));
+    //     // let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+    //     // let ciphertext_arr = match hex::decode(ciphertext) {
+    //     //     Ok(arr) => arr,
+    //     //     Err(_) => return Err("Invalid hex ciphertext"),
+    //     // };
+    
+    //     // let plaintext = cipher.decrypt(&nonce, ciphertext_arr.as_ref())
+    //     //     .map_err(|_| "Decryption error")?;
+    
+    //     // Ok(String::from_utf8(plaintext).map_err(|_| "Cannot decode plaintext")?)
+    // }
+    // pub fn encrypt_data() -> Result<(), aes_gcm::Error> {
+    //     let key: &[u8; 32] = &[42; 32];
+    //     let key: &Key<Aes256Gcm> = key.into();
+
+    //     let cipher = Aes256Gcm::new(key);
+    //     let mut nonce_bytes = [0u8; 12];
+    //     OsRng.fill_bytes(&mut nonce_bytes);
+    //     let nonce = Nonce::from(nonce_bytes);
+    //     let ciphertext = cipher.encrypt(&nonce, b"plaintext message".as_ref())?;
+    //     let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref())?;
+    //     assert_eq!(&plaintext, b"plaintext message");
+
+    //     Ok(())
+    // }
+
+    // fn decrypt_data(key: &[u8], iv: &[u8], data: &[u8]) -> Result<Vec<u8>, String> {
+    //     let cipher = Aes256Gcm::new(Key::from_slice(key));
+    //     let nonce = Nonce::from_slice(iv);
+    //     match cipher.decrypt(nonce, data) {
+    //         Ok(plaintext) => Ok(plaintext),
+    //         Err(e) => Err(format!("Decryption failed: {}", e))
+    //     }
+    // }
+
+    fn text_to_bytes(text: &str) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(text.as_bytes());
+        hasher.finalize().into()
     }
 }
