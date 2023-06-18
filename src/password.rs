@@ -1,5 +1,6 @@
 use colored::*;
 use std::{
+    borrow::Cow,
     fs,
     fs::File,
     io::{stdin, stdout},
@@ -25,22 +26,83 @@ use sha2::{Digest, Sha256};
 
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
-    Aes256Gcm, Nonce, Key,
+    Aes256Gcm, Key, Nonce,
 };
 
 use hex;
+
+// mod config;
+// use config;
+
+// mod crate::config;
+use crate::config::Config;
+
+// use crate::config::Config;
 // use aes_gcm::{Aead, Aes256Gcm, Key, Nonce};
 // use rand::rngs::OsRng;
 // use rand::RngCore;
 // use std::convert::TryInto;
 
 pub struct Password {
+    password: String,
+}
+pub struct PasswordItem {
     name: String,
     content: String,
-    index: u16,
+    index: i16,
 }
 
 impl Password {
+    pub fn new(current_password: String) -> Password {
+        return Password {
+            password: current_password,
+        };
+    }
+
+    pub fn get_main_password() -> String {
+        Password::tm_clear();
+
+        let password_file = Config::config_file_password_hash_path();
+        let path = password_file.as_path();
+
+        if path.exists() {
+            let pass = rpassword::prompt_password("Enter main password: ").unwrap();
+            let hash = Config::read_text_file(password_file);
+            let user_enter_pass_hash = Config::make_password_hash(&pass);
+
+            if user_enter_pass_hash == hash {
+                return pass;
+            } else {
+                println!("{}", "Invalid password. Please try again.".red().bold());
+                std::process::exit(0);
+            }
+        } else {
+            return Password::login_by_password();
+        }
+    }
+
+    pub fn login_by_password() -> String {
+        loop {
+            println!("{}\n", "For the first time, users need to set a master password in order to access all of their saved passwords.".bold());
+
+            let password1 = rpassword::prompt_password("Enter main password: ").unwrap();
+            let password2 = rpassword::prompt_password("Repeat the password: ").unwrap();
+
+            if password1 == password2 {
+                let config_path = Config::config_file_password_hash_path();
+                let mut file = File::create(config_path).unwrap();
+
+                file.write_all(Config::make_password_hash(&password1).as_bytes())
+                    .unwrap();
+
+                return password1;
+            } else {
+                Password::tm_clear();
+                println!("{}", "Error: Password and confirmation do not match.".red());
+            }
+        }
+    }
+
     pub fn get_input(mut err_message: &str) -> String {
         err_message = if err_message == "" {
             "Invalid choice, please try again."
@@ -54,7 +116,7 @@ impl Password {
         return result;
     }
 
-    pub fn main_menu(auto_clear: bool) {
+    pub fn main_menu(&self, auto_clear: bool) {
         if auto_clear {
             Password::tm_clear();
         }
@@ -78,7 +140,7 @@ impl Password {
                 Ok(num) => {
                     if num >= 1 && num <= 6 {
                         // چک کردن عدد در محدوده مورد نظر
-                        Password::manage_menu(num);
+                        self.manage_menu(num);
                         break;
                     } else {
                         Password::tm_clear();
@@ -93,12 +155,12 @@ impl Password {
         }
     }
 
-    pub fn getKyesFilesList() -> Vec<Password> {
+    pub fn getKyesFilesList() -> Vec<PasswordItem> {
         let path = Password::get_path_keys();
-        let mut files: Vec<Password> = Vec::new();
+        let mut files: Vec<PasswordItem> = Vec::new();
 
         if let Ok(entries) = fs::read_dir(path) {
-            let mut idx: u16 = 0;
+            let mut idx: i16 = 0;
 
             for entry in entries {
                 if let Ok(entry) = entry {
@@ -107,7 +169,7 @@ impl Password {
                         let file_name = path.file_name().unwrap_or_default().to_str().unwrap();
 
                         idx += 1;
-                        files.push(Password {
+                        files.push(PasswordItem {
                             name: file_name.to_string(),
                             index: idx,
                             content: "".to_string(),
@@ -120,7 +182,7 @@ impl Password {
         return files;
     }
 
-    pub fn show_list_of_passwords() -> Vec<Password> {
+    pub fn show_list_of_passwords() -> Vec<PasswordItem> {
         Password::tm_clear();
 
         println!("Password list: \n");
@@ -147,7 +209,7 @@ impl Password {
         // println!("List {:?}", list);
     }
 
-    pub fn get_password_index_and_show_content(list: &Vec<Password>) {
+    pub fn get_password_index_and_show_content(&self, list: &mut Vec<PasswordItem>) {
         print!("Please send password number: ");
         stdout().flush().unwrap();
 
@@ -155,15 +217,18 @@ impl Password {
 
         let mut select_pass_index = 0;
 
-        match get_index.trim().parse::<u16>() {
+        match get_index.trim().parse::<i16>() {
             Ok(number) => select_pass_index = number,
             Err(_) => eprintln!("Error: The input is not a valid integer"),
         }
 
-        let password = Password::find_password_by_index(select_pass_index, &list);
+        let password = self.find_password_by_index(select_pass_index, list).unwrap();
+        println!("password:{}",password.content);
+        // let mut password = password as &mut Password;
+        // password.content = ;
     }
 
-    // fn find_password(index: u16, passwords: &[Password]) -> Option<&Password> {
+    // fn find_password(index: i16, passwords: &[Password]) -> Option<&Password> {
     //     for password in passwords.iter() {
     //         if password.index == index {
     //             return Some(password);
@@ -172,15 +237,58 @@ impl Password {
     //     None
     // }
 
-    pub fn find_password_by_index(index: u16, list: &Vec<Password>) -> Option<&Password> {
-        for pass in list.iter() {
-            if (pass.index == index) {
-                return Some(pass);
+    pub fn find_password_by_index(
+        &self,
+        index: i16,
+        list: &mut Vec<PasswordItem>,
+    ) -> Option<PasswordItem> {
+
+
+        let mut find = PasswordItem {
+            name: "".to_string(),
+            content: "".to_string(),
+            index: -1,
+        };
+        
+        for mut pass in list.iter_mut() {
+            if pass.index == index {
+                // let mut find = pass;
+                println!("befor read pass file:index:{}", pass.index);
+
+                let pass_path = Config::get_path_keys().join(&pass.name);
+                println!("c:{}",pass_path.display());
+                let content = Config::read_file(pass_path);
+
+
+                find.name = pass.name.clone();
+                find.index = pass.index;
+                find.content = Config::decode(self.password.as_str(), content).to_string();
+                // return pass;
+                return Some(find);
             }
         }
 
         None
+        // return &find;
     }
+
+    // pub fn find_password_by_index(&self, index: i16, list: &mut Vec<PasswordItem>) -> Option<&PasswordItem> {
+    //     for pass in list.iter_mut() {
+    //         if pass.index == index {
+    //             let pass_path = Config::get_path_keys().join(&pass.name);
+    //             let content = Config::read_text_file(pass_path);
+
+    //             // Use Cow to store the owned and borrowed values of the content string.
+    //             let decoded_content = Config::decode(self.password.as_str(), content.as_str());
+    //             let owned_content = String::from(decoded_content);
+    //             pass.content = Cow::Owned(owned_content).to_string();
+
+    //             return Some(pass);
+    //         }
+    //     }
+
+    //     None
+    // }
 
     pub fn tm_clear() {
         let mut stdout = stdout();
@@ -188,14 +296,14 @@ impl Password {
         stdout.execute(Clear(ClearType::All)).unwrap();
     }
 
-    fn manage_menu(number: i8) {
+    fn manage_menu(&self, number: i8) {
         if number == 1 {
-            let list = Password::show_list_of_passwords();
-            Password::get_password_index_and_show_content(&list);
+            let mut list = Password::show_list_of_passwords();
+            self.get_password_index_and_show_content(&mut list);
         } else if number == 2 {
-            Password::create_new_password();
+            self.create_new_password();
         } else if (number == 5) {
-            Password::config_the_storage_keys();
+            self.config_the_storage_keys();
         } else if (number == 6) {
             println!("{}", "Goodbay.".bold());
             std::process::exit(0);
@@ -226,7 +334,7 @@ impl Password {
         return Path::new(content.trim()).to_path_buf();
     }
 
-    pub fn config_the_storage_keys() {
+    pub fn config_the_storage_keys(&self) {
         let mut first = true;
 
         Password::tm_clear();
@@ -256,7 +364,7 @@ impl Password {
                         file.write_all(keys_path.as_path().display().to_string().as_bytes())
                             .unwrap();
 
-                        Password::main_menu(true);
+                        self.main_menu(true);
                         break;
                     } else if num == 2 {
                     } else {
@@ -274,7 +382,7 @@ impl Password {
         }
     }
 
-    pub fn init_config() {
+    pub fn init_config(&self) {
         let config_epass = Password::get_path_config();
 
         let path = Path::new(config_epass.as_path());
@@ -284,41 +392,41 @@ impl Password {
         fs::create_dir_all(config_epass).expect(error.trim());
     }
 
-    pub fn init_save_keys_path() {
+    pub fn init_save_keys_path(&self) {
         // let mut config_path = dirs::document_dir().expect(Password::error_access_message());
         // let config_epass = config_path.join("Keys");
         let config_epass = Password::get_path_keys();
         fs::create_dir_all(config_epass).expect(Password::error_access_message());
     }
 
-    pub fn check_current_pass() {
-        let storage_keys_path = Password::get_path_config_keys();
-        let hash_file = Path::new(storage_keys_path.as_path());
+    // pub fn check_current_pass(&self) {
+    //     let storage_keys_path = Password::get_path_config_keys();
+    //     let hash_file = Path::new(storage_keys_path.as_path());
 
-        if (hash_file.exists() == false) {
-            Password::tm_clear();
-            println!("{}", "About:".bold());
-            println!("{}","epass is a simple and secure program for saving, viewing, and managing passwords locally and offline");
-            println!("repo: {}", "https://github.com/parsgit/epass");
-            println!("version: {}\n\n", "1.0.0".bold());
+    //     if (hash_file.exists() == false) {
+    //         Password::tm_clear();
+    //         println!("{}", "About:".bold());
+    //         println!("{}","epass is a simple and secure program for saving, viewing, and managing passwords locally and offline");
+    //         println!("repo: {}", "https://github.com/parsgit/epass");
+    //         println!("version: {}\n\n", "1.0.0".bold());
 
-            Password::config_the_storage_keys();
-            // print!("{}", "Enter your password: ".yellow());
-            // stdout().flush().unwrap();
+    //         self.config_the_storage_keys();
+    //         // print!("{}", "Enter your password: ".yellow());
+    //         // stdout().flush().unwrap();
 
-            // let password = Password::get_input("");
+    //         // let password = Password::get_input("");
 
-            // let password2 = rpassword::prompt_password("Repeat the password: ").unwrap();
+    //         // let password2 = rpassword::prompt_password("Repeat the password: ").unwrap();
 
-            // if (password.trim() == password2.trim()) {
-            //     Password::tm_clear();
-            //     println!("{}\n", "✅ Password saved".green().bold());
-            //     Password::main_menu(false);
-            // }
-        }
-    }
+    //         // if (password.trim() == password2.trim()) {
+    //         //     Password::tm_clear();
+    //         //     println!("{}\n", "✅ Password saved".green().bold());
+    //         //     Password::main_menu(false);
+    //         // }
+    //     }
+    // }
 
-    fn create_new_password() {
+    fn create_new_password(&self) {
         Password::tm_clear();
         println!("{}", "Send 0 to cancel and return to the menu");
         print!("{}", "The title of the new password: ".blue().bold());
@@ -326,7 +434,7 @@ impl Password {
         let name = Password::get_input("");
 
         if name.trim() == "0" {
-            Password::main_menu(true);
+            self.main_menu(true);
         } else {
             print!("{}", "Enter your password: ".yellow());
             stdout().flush().unwrap();
@@ -339,14 +447,7 @@ impl Password {
                 Password::tm_clear();
 
                 let mut file = File::create(Password::get_path_keys().join(name.trim())).unwrap();
-
-
-                let key: &[u8; 32] = &Password::text_to_bytes("hello ben");
-                let key: &Key<Aes256Gcm> = key.into();
-                let cipher = Aes256Gcm::new(&key);
-                let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // 96-bits; unique per message
-                let ciphertext = cipher.encrypt(&nonce, b"plaintext message".as_ref()).unwrap();
-
+                let ciphertext = Config::encode(&self.password, &password);
                 file.write_all(&ciphertext).unwrap();
 
                 println!("{}\n", "✅ Password saved".green().bold());
@@ -388,28 +489,27 @@ impl Password {
     //     return "".to_string();
     // }
 
-
     // pub fn decode(key: &str, ciphertext: &str) -> Result<String, &'static str> {
     //     // let key_arr = match hex::decode(key) {
     //     //     Ok(arr) => arr,
     //     //     Err(_) => return Err("Invalid hex key"),
     //     // };
-    
+
     //     // let k: &[u8; 32] = match key_arr.as_slice().try_into() {
     //     //     Ok(k) => k,
     //     //     Err(_) => return Err("Invalid key length"),
     //     // };
-    
+
     //     // let cipher = Aes256Gcm::new(&Key::<Aes256Gcm>::from_slice(k));
     //     // let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     //     // let ciphertext_arr = match hex::decode(ciphertext) {
     //     //     Ok(arr) => arr,
     //     //     Err(_) => return Err("Invalid hex ciphertext"),
     //     // };
-    
+
     //     // let plaintext = cipher.decrypt(&nonce, ciphertext_arr.as_ref())
     //     //     .map_err(|_| "Decryption error")?;
-    
+
     //     // Ok(String::from_utf8(plaintext).map_err(|_| "Cannot decode plaintext")?)
     // }
     // pub fn encrypt_data() -> Result<(), aes_gcm::Error> {
