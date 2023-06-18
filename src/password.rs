@@ -3,14 +3,16 @@ use std::{
     borrow::Cow,
     fs,
     fs::File,
-    io::{stdin, stdout},
+    io::{stdin, stdout, Read},
     path::{Path, PathBuf},
 };
 // use std::io::stdout;
 use rpassword;
 use std::io::Write;
 //use termion::{clear, cursor};
-use crossterm::cursor::{position, MoveTo};
+use crossterm::{
+    cursor::{position, MoveTo, MoveToColumn},
+};
 use crossterm::{
     terminal::{Clear, ClearType},
     ExecutableCommand,
@@ -23,6 +25,9 @@ use sha2::{Digest, Sha256};
 //     Key, // Or `Aes128Gcm`
 //     Nonce,
 // };
+use crossterm::{execute, cursor, terminal, style::{Color, Print, SetForegroundColor}};
+use std::time::Duration;
+use std::{thread, time};
 
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
@@ -222,10 +227,74 @@ impl Password {
             Err(_) => eprintln!("Error: The input is not a valid integer"),
         }
 
-        let password = self.find_password_by_index(select_pass_index, list).unwrap();
-        println!("password:{}",password.content);
-        // let mut password = password as &mut Password;
-        // password.content = ;
+        let password = self
+            .find_password_by_index(select_pass_index, list)
+            .unwrap();
+        println!("\npassword:{}\n", password.content.bold());
+        // println!();
+
+        let mut seconds = 10;
+        let mut stdout = stdout();
+    
+        execute!(stdout, cursor::Hide).unwrap();
+    
+        while seconds > 0 {
+    
+            execute!(
+                stdout,
+                terminal::Clear(terminal::ClearType::CurrentLine),
+                cursor::MoveToColumn(0),
+                // SetForegroundColor(Color::Red),
+                Print(format!("{} seconds left", seconds))
+            ).unwrap();
+            stdout.flush().unwrap();
+    
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            seconds -= 1;
+        }
+    
+        execute!(
+            stdout,
+            terminal::Clear(terminal::ClearType::CurrentLine),
+            cursor::MoveToColumn(0),
+            Print("Time's up!")
+        ).unwrap();
+        stdout.flush().unwrap();
+    
+        execute!(stdout, cursor::Show).unwrap();
+        stdout.flush().unwrap();
+
+        Password::tm_clear();
+        self.main_menu(false);
+        // let mut count = 10;
+        // let one_sec = time::Duration::from_secs(1);
+
+        // loop {
+        //     println!("1:{}",count);
+        //     let stdout_mutex = stdout();
+        //     let mut stdout_handle = stdout_mutex.lock();
+
+        //     write!(stdout_handle, "{}", count).unwrap();
+        //     stdout_handle.flush().unwrap();
+        //     count -= 1;
+
+        //     if count == -1 {
+        //         write!(stdout_handle, "\nDone!").unwrap();
+        //         break;
+        //     }
+
+        //     thread::sleep(one_sec);
+
+        //     if stdin().bytes().next().is_some() {
+        //         write!(stdout_handle, "{}", "\nInterrupted by User!").unwrap();
+        //         break;
+        //     }
+
+        //     write!(stdout_handle, "\r").unwrap();
+        // }
+
+        // thread::sleep(Duration::from_secs(10));
+        // self.main_menu(true);
     }
 
     // fn find_password(index: i16, passwords: &[Password]) -> Option<&Password> {
@@ -242,28 +311,21 @@ impl Password {
         index: i16,
         list: &mut Vec<PasswordItem>,
     ) -> Option<PasswordItem> {
-
-
         let mut find = PasswordItem {
             name: "".to_string(),
             content: "".to_string(),
             index: -1,
         };
-        
+
         for mut pass in list.iter_mut() {
             if pass.index == index {
-                // let mut find = pass;
-                println!("befor read pass file:index:{}", pass.index);
-
                 let pass_path = Config::get_path_keys().join(&pass.name);
-                println!("c:{}",pass_path.display());
                 let content = Config::read_file(pass_path);
-
 
                 find.name = pass.name.clone();
                 find.index = pass.index;
                 find.content = Config::decode(self.password.as_str(), content).to_string();
-                // return pass;
+
                 return Some(find);
             }
         }
@@ -448,97 +510,10 @@ impl Password {
 
                 let mut file = File::create(Password::get_path_keys().join(name.trim())).unwrap();
                 let ciphertext = Config::encode(&self.password, &password);
-                file.write_all(&ciphertext).unwrap();
+                file.write_all(&ciphertext.as_bytes()).unwrap();
 
                 println!("{}\n", "✅ Password saved".green().bold());
             }
         }
-    }
-
-    // pub fn encrypt_data() -> String {
-    //     // The encryption key can be generated randomly:
-    //     // let key = Aes256Gcm::generate_key("hello");
-
-    //     // println!("key:{:?}", b"hello");
-    //     // let key: &[u8; 32] = &[42; 32];
-    //     // let key: &Key<Aes256Gcm> = b"hello".into();
-    //     // // Transformed from a byte array:
-    //     // let key: &[u8; 32] = &[42; 32];
-    //     // let key: &Key<Aes256Gcm> = key.into();
-    //     // println!("key:{:?}", key);
-
-    //     // // Note that you can get byte array from slice using the `TryInto` trait:
-    //     // let key: &[u8] = &[42; 32];
-    //     // let key: [u8; 32] = key.try_into().unwrap();
-
-    //     // Alternatively, the key can be transformed directly from a byte slice
-    //     // (panicks on length mismatch):
-    //     // let key = Key::<Aes256Gcm>::from_slice(b"hello");
-
-    //     // let cipher = Aes256Gcm::new(&key);
-    //     // let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // 96-bits; unique per message
-    //     // let ciphertext = cipher.encrypt(&nonce, b"plaintext message".as_ref()).unwrap();
-    //     // let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).unwrap();
-
-    //     // println!("test:{:?}",plaintext);
-    //     // assert_eq!(&plaintext, b"plaintext message");
-
-    //     let my_key: &[u8; 32] = b"My super secret key       ";
-    //     let key: &Key<Aes256Gcm> = my_key.into();
-
-    //     return "".to_string();
-    // }
-
-    // pub fn decode(key: &str, ciphertext: &str) -> Result<String, &'static str> {
-    //     // let key_arr = match hex::decode(key) {
-    //     //     Ok(arr) => arr,
-    //     //     Err(_) => return Err("Invalid hex key"),
-    //     // };
-
-    //     // let k: &[u8; 32] = match key_arr.as_slice().try_into() {
-    //     //     Ok(k) => k,
-    //     //     Err(_) => return Err("Invalid key length"),
-    //     // };
-
-    //     // let cipher = Aes256Gcm::new(&Key::<Aes256Gcm>::from_slice(k));
-    //     // let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-    //     // let ciphertext_arr = match hex::decode(ciphertext) {
-    //     //     Ok(arr) => arr,
-    //     //     Err(_) => return Err("Invalid hex ciphertext"),
-    //     // };
-
-    //     // let plaintext = cipher.decrypt(&nonce, ciphertext_arr.as_ref())
-    //     //     .map_err(|_| "Decryption error")?;
-
-    //     // Ok(String::from_utf8(plaintext).map_err(|_| "Cannot decode plaintext")?)
-    // }
-    // pub fn encrypt_data() -> Result<(), aes_gcm::Error> {
-    //     let key: &[u8; 32] = &[42; 32];
-    //     let key: &Key<Aes256Gcm> = key.into();
-
-    //     let cipher = Aes256Gcm::new(key);
-    //     let mut nonce_bytes = [0u8; 12];
-    //     OsRng.fill_bytes(&mut nonce_bytes);
-    //     let nonce = Nonce::from(nonce_bytes);
-    //     let ciphertext = cipher.encrypt(&nonce, b"plaintext message".as_ref())?;
-    //     let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref())?;
-    //     assert_eq!(&plaintext, b"plaintext message");
-
-    //     Ok(())
-    // }
-
-    // fn decrypt_data(key: &[u8], iv: &[u8], data: &[u8]) -> Result<Vec<u8>, String> {
-    //     let cipher = Aes256Gcm::new(Key::from_slice(key));
-    //     let nonce = Nonce::from_slice(iv);
-    //     match cipher.decrypt(nonce, data) {
-    //         Ok(plaintext) => Ok(plaintext),
-    //         Err(e) => Err(format!("Decryption failed: {}", e))
-    //     }
-    // }
-
-    fn text_to_bytes(text: &str) -> [u8; 32] {
-        let mut hasher = Sha256::new();
-        hasher.update(text.as_bytes());
-        hasher.finalize().into()
     }
 }

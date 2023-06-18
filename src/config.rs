@@ -8,7 +8,7 @@ use sha2::Sha256;
 use sha3::{Digest, Sha3_256};
 
 use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng},
+    aead::{Aead, AeadCore, KeyInit, OsRng, generic_array::GenericArray},
     Aes256Gcm, Key, Nonce,
 };
 
@@ -74,25 +74,34 @@ impl Config {
     }
 
     pub fn decode(key :&str, ciphertext:Vec<u8>)->String {
+        let text  = String::from_utf8(ciphertext).unwrap();
+        let array:Vec<&str> = text.split(":").collect();
+        let nonce_str = array[0];
+        let cipher_str = array[1];
+
+        
         let key: &[u8; 32] = &Config::text_to_bytes(key);
         let key: &Key<Aes256Gcm> = key.into();
-        println!("1");
-        let cipher = Aes256Gcm::new(&key);
-        let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // 96-bits; unique per message
-        println!("2");
 
-        let plaintext = cipher.decrypt(&nonce, ciphertext.as_ref()).unwrap();
-        println!("{:?}",plaintext);
+        let cipher = Aes256Gcm::new(&key);
+        
+        let cd = hex::decode(cipher_str).unwrap();
+        let nn = hex::decode(nonce_str).unwrap();
+        let nd = GenericArray::from_slice(&nn);
+        
+        let plaintext = cipher.decrypt(nd, cd.as_ref()).unwrap();
         return std::str::from_utf8(&plaintext).unwrap().to_string();
     }
 
-    pub fn encode(key: &str, content: &str) -> Vec<u8> {
+    pub fn encode(key: &str, content: &str) -> String {
         let key: &[u8; 32] = &Config::text_to_bytes(key);
         let key: &Key<Aes256Gcm> = key.into();
         let cipher = Aes256Gcm::new(&key);
         let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // 96-bits; unique per message
         let ciphertext = cipher.encrypt(&nonce, content.as_ref()).unwrap();
 
-        return ciphertext;
+        let nonce_string = hex::encode(nonce);
+
+         format!("{}:{}",nonce_string, hex::encode(&ciphertext))
     }
 }
