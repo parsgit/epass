@@ -1,4 +1,5 @@
 use colored::*;
+use rand::Rng;
 use std::{
     borrow::Cow,
     fs,
@@ -10,9 +11,7 @@ use std::{
 use rpassword;
 use std::io::Write;
 //use termion::{clear, cursor};
-use crossterm::{
-    cursor::{position, MoveTo, MoveToColumn},
-};
+use crossterm::cursor::{position, MoveTo, MoveToColumn};
 use crossterm::{
     terminal::{Clear, ClearType},
     ExecutableCommand,
@@ -25,7 +24,11 @@ use sha2::{Digest, Sha256};
 //     Key, // Or `Aes128Gcm`
 //     Nonce,
 // };
-use crossterm::{execute, cursor, terminal, style::{Color, Print, SetForegroundColor}};
+use crossterm::{
+    cursor, execute,
+    style::{Color, Print, SetForegroundColor},
+    terminal,
+};
 use std::time::Duration;
 use std::{thread, time};
 
@@ -66,6 +69,7 @@ impl Password {
 
     pub fn get_main_password() -> String {
         Password::tm_clear();
+
 
         let password_file = Config::config_file_password_hash_path();
         let path = password_file.as_path();
@@ -126,12 +130,14 @@ impl Password {
             Password::tm_clear();
         }
         loop {
-            println!("{}", "1) View Password List".bold());
-            println!("{}", "2) Save New Password".bold());
+            println!("{}", "1) Show Password".bold());
+            println!("{}", "2) Add Password".bold());
             println!("{}", "3) Edit Password".bold());
             println!("{}", "4) Delete Password".bold());
-            println!("5) Set Password Storage");
-            println!("6) Exit");
+            println!("6) Change Main Password");
+            println!("5) Export");
+            println!("5) Import");
+            println!("7) Exit");
             print!("\n{}", "Please select an option: ".cyan());
             stdout().flush().unwrap();
 
@@ -161,7 +167,7 @@ impl Password {
     }
 
     pub fn getKyesFilesList() -> Vec<PasswordItem> {
-        let path = Password::get_path_keys();
+        let path = Config::get_path_keys();
         let mut files: Vec<PasswordItem> = Vec::new();
 
         if let Ok(entries) = fs::read_dir(path) {
@@ -187,10 +193,10 @@ impl Password {
         return files;
     }
 
-    pub fn show_list_of_passwords() -> Vec<PasswordItem> {
+    pub fn show_list_of_passwords(&self) -> Vec<PasswordItem> {
         Password::tm_clear();
 
-        println!("Password list: \n");
+        println!("Password list:");
         let list = Password::getKyesFilesList();
 
         let mut idx = 1;
@@ -215,101 +221,84 @@ impl Password {
     }
 
     pub fn get_password_index_and_show_content(&self, list: &mut Vec<PasswordItem>) {
-        print!("Please send password number: ");
+        println!("\n{}", "Send 0 to cancel and return to the menu");
+        print!("{}", "Please send password number: ".bold());
         stdout().flush().unwrap();
 
         let get_index = Password::get_input("");
+
+        if get_index.trim() == "0" {
+            self.main_menu(true);
+            return;
+        }
 
         let mut select_pass_index = 0;
 
         match get_index.trim().parse::<i16>() {
             Ok(number) => select_pass_index = number,
-            Err(_) => eprintln!("Error: The input is not a valid integer"),
+            Err(_) => {
+                Password::tm_clear();
+                println!("{}", "Error: The input is not a valid integer".red());
+                self.main_menu(false);
+                return;
+            }
         }
 
-        let password = self
-            .find_password_by_index(select_pass_index, list)
-            .unwrap();
+        let password = self.find_password_by_index(select_pass_index, list, true);
+
+        let password = match password {
+            Some(p) => p,
+            None => {
+                Password::tm_clear();
+                println!("{}", "Password not found".red());
+                self.main_menu(false);
+                return;
+            }
+        };
+
         println!("\npassword:{}\n", password.content.bold());
-        // println!();
 
         let mut seconds = 10;
         let mut stdout = stdout();
-    
+
         execute!(stdout, cursor::Hide).unwrap();
-    
+
         while seconds > 0 {
-    
             execute!(
                 stdout,
                 terminal::Clear(terminal::ClearType::CurrentLine),
                 cursor::MoveToColumn(0),
                 // SetForegroundColor(Color::Red),
                 Print(format!("{} seconds left", seconds))
-            ).unwrap();
+            )
+            .unwrap();
             stdout.flush().unwrap();
-    
+
             std::thread::sleep(std::time::Duration::from_secs(1));
             seconds -= 1;
         }
-    
+
         execute!(
             stdout,
             terminal::Clear(terminal::ClearType::CurrentLine),
             cursor::MoveToColumn(0),
             Print("Time's up!")
-        ).unwrap();
+        )
+        .unwrap();
         stdout.flush().unwrap();
-    
+
         execute!(stdout, cursor::Show).unwrap();
         stdout.flush().unwrap();
 
         Password::tm_clear();
         self.main_menu(false);
-        // let mut count = 10;
-        // let one_sec = time::Duration::from_secs(1);
-
-        // loop {
-        //     println!("1:{}",count);
-        //     let stdout_mutex = stdout();
-        //     let mut stdout_handle = stdout_mutex.lock();
-
-        //     write!(stdout_handle, "{}", count).unwrap();
-        //     stdout_handle.flush().unwrap();
-        //     count -= 1;
-
-        //     if count == -1 {
-        //         write!(stdout_handle, "\nDone!").unwrap();
-        //         break;
-        //     }
-
-        //     thread::sleep(one_sec);
-
-        //     if stdin().bytes().next().is_some() {
-        //         write!(stdout_handle, "{}", "\nInterrupted by User!").unwrap();
-        //         break;
-        //     }
-
-        //     write!(stdout_handle, "\r").unwrap();
-        // }
-
-        // thread::sleep(Duration::from_secs(10));
-        // self.main_menu(true);
     }
-
-    // fn find_password(index: i16, passwords: &[Password]) -> Option<&Password> {
-    //     for password in passwords.iter() {
-    //         if password.index == index {
-    //             return Some(password);
-    //         }
-    //     }
-    //     None
-    // }
 
     pub fn find_password_by_index(
         &self,
         index: i16,
         list: &mut Vec<PasswordItem>,
+        decode: bool
     ) -> Option<PasswordItem> {
         let mut find = PasswordItem {
             name: "".to_string(),
@@ -324,7 +313,9 @@ impl Password {
 
                 find.name = pass.name.clone();
                 find.index = pass.index;
-                find.content = Config::decode(self.password.as_str(), content).to_string();
+                if decode{
+                    find.content = Config::decode(self.password.as_str(), content).to_string();
+                }
 
                 return Some(find);
             }
@@ -334,24 +325,6 @@ impl Password {
         // return &find;
     }
 
-    // pub fn find_password_by_index(&self, index: i16, list: &mut Vec<PasswordItem>) -> Option<&PasswordItem> {
-    //     for pass in list.iter_mut() {
-    //         if pass.index == index {
-    //             let pass_path = Config::get_path_keys().join(&pass.name);
-    //             let content = Config::read_text_file(pass_path);
-
-    //             // Use Cow to store the owned and borrowed values of the content string.
-    //             let decoded_content = Config::decode(self.password.as_str(), content.as_str());
-    //             let owned_content = String::from(decoded_content);
-    //             pass.content = Cow::Owned(owned_content).to_string();
-
-    //             return Some(pass);
-    //         }
-    //     }
-
-    //     None
-    // }
-
     pub fn tm_clear() {
         let mut stdout = stdout();
         stdout.execute(MoveTo(0, 0)).unwrap();
@@ -360,15 +333,76 @@ impl Password {
 
     fn manage_menu(&self, number: i8) {
         if number == 1 {
-            let mut list = Password::show_list_of_passwords();
+            let mut list = self.show_list_of_passwords();
             self.get_password_index_and_show_content(&mut list);
         } else if number == 2 {
             self.create_new_password();
-        } else if (number == 5) {
-            self.config_the_storage_keys();
-        } else if (number == 6) {
+        } else if number == 4 {
+            self.delete_a_password();
+        } else if number == 5 {
+            // self.config_the_storage_keys();
+        } else if number == 6 {
             println!("{}", "Goodbay.".bold());
             std::process::exit(0);
+        }
+    }
+
+    pub fn delete_a_password(&self) {
+        let mut list = self.show_list_of_passwords();
+        print!(
+            "\n{}{}: ",
+            "Enter the password number to ".bright_purple(),"delete".bold().red()
+        );
+        stdout().flush().unwrap();
+
+        let mut number_string = String::new();
+
+        stdin().read_line(&mut number_string).unwrap();
+
+        let number = match number_string.trim().parse::<i16>() {
+            Ok(p) => p,
+            Err(_) => {
+                Password::tm_clear();
+                println!("{}","The entered expression is not correct. You must enter the password number as a number".red());
+                self.main_menu(false);
+                return;
+            }
+        };
+
+        let item = self.find_password_by_index(number, &mut list, false);
+
+        match item {
+            Some(item) => {
+                let mut rng = rand::thread_rng();
+                let src: String = (0..4).map(|_| rng.gen_range(0..=9).to_string()).collect();
+                println!("(You are removing the password named '{}')", item.name.bold());
+                print!("Send the number {} to remove the password: ",src);
+                stdout().flush().unwrap();
+
+                let mut get_sec = String::new();
+                stdin().read_line(&mut get_sec).unwrap();
+                
+                if src.trim() == get_sec.trim(){
+                    fs::remove_file(Config::get_path_keys().join(item.name)).unwrap();
+
+                    Password::tm_clear();
+                    println!("{}","Password removed".green().bold());
+                    self.main_menu(false);
+                    return;
+                }
+                else{
+                    Password::tm_clear();
+                    println!("{}","The security number sent was incorrect".red());
+                    self.main_menu(false);
+                    return;
+                }
+            }
+            None => {
+                Password::tm_clear();
+                println!("{}", "Password not found".red());
+                self.main_menu(false);
+                return;
+            }
         }
     }
 
@@ -385,66 +419,66 @@ impl Password {
         Password::get_path_config().join("storage_kyes_path")
     }
 
-    pub fn get_path_default_documents() -> PathBuf {
-        let documents = dirs::home_dir().unwrap().join("Documents");
-        return documents;
-    }
+    // pub fn get_path_default_documents() -> PathBuf {
+    //     let documents = dirs::home_dir().unwrap().join("Documents");
+    //     return documents;
+    // }
 
-    pub fn get_path_keys() -> PathBuf {
-        let file = Password::get_path_config_keys();
-        let content = fs::read_to_string(file).unwrap();
-        return Path::new(content.trim()).to_path_buf();
-    }
+    // pub fn get_path_keys() -> PathBuf {
+    //     let file = Password::get_path_config_keys();
+    //     let content = fs::read_to_string(file).unwrap();
+    //     return Path::new(content.trim()).to_path_buf();
+    // }
 
-    pub fn config_the_storage_keys(&self) {
-        let mut first = true;
+    // pub fn config_the_storage_keys(&self) {
+    //     let mut first = true;
 
-        Password::tm_clear();
+    //     Password::tm_clear();
 
-        loop {
-            println!(
-                "Select the password storage location (all information will be stored encrypted)"
-            );
-            println!(
-                " {}",
-                "1. Set default save location to Documents/Keys".bold()
-            );
-            println!(" {}", "2. Set custom save location".bold());
-            print!("{}", "Choose an option: ".blue());
-            stdout().flush().unwrap();
+    //     loop {
+    //         println!(
+    //             "Select the password storage location (all information will be stored encrypted)"
+    //         );
+    //         println!(
+    //             " {}",
+    //             "1. Set default save location to Documents/Keys".bold()
+    //         );
+    //         println!(" {}", "2. Set custom save location".bold());
+    //         print!("{}", "Choose an option: ".blue());
+    //         stdout().flush().unwrap();
 
-            let mut choice = String::new();
-            stdin().read_line(&mut choice).expect("Failed to read line");
+    //         let mut choice = String::new();
+    //         stdin().read_line(&mut choice).expect("Failed to read line");
 
-            match choice.trim().parse::<i8>() {
-                Ok(num) => {
-                    if num == 1 {
-                        let keys_path = Password::get_path_default_documents().join("Keys");
-                        let keys_path_config_file_path = Password::get_path_config_keys();
+    //         match choice.trim().parse::<i8>() {
+    //             Ok(num) => {
+    //                 if num == 1 {
+    //                     let keys_path = Password::get_path_default_documents().join("Keys");
+    //                     let keys_path_config_file_path = Password::get_path_config_keys();
 
-                        let mut file = File::create(keys_path_config_file_path).unwrap();
-                        file.write_all(keys_path.as_path().display().to_string().as_bytes())
-                            .unwrap();
+    //                     let mut file = File::create(keys_path_config_file_path).unwrap();
+    //                     file.write_all(keys_path.as_path().display().to_string().as_bytes())
+    //                         .unwrap();
 
-                        self.main_menu(true);
-                        break;
-                    } else if num == 2 {
-                    } else {
-                        Password::tm_clear();
+    //                     self.main_menu(true);
+    //                     break;
+    //                 } else if num == 2 {
+    //                 } else {
+    //                     Password::tm_clear();
 
-                        println!("{}", "Invalid input, please select 1 or 2".red());
-                    }
-                }
-                Err(_) => {
-                    Password::tm_clear();
+    //                     println!("{}", "Invalid input, please select 1 or 2".red());
+    //                 }
+    //             }
+    //             Err(_) => {
+    //                 Password::tm_clear();
 
-                    println!("{}", "Invalid input, please select 1 or 2".red());
-                }
-            }
-        }
-    }
+    //                 println!("{}", "Invalid input, please select 1 or 2".red());
+    //             }
+    //         }
+    //     }
+    // }
 
-    pub fn init_config(&self) {
+    pub fn init_config() {
         let config_epass = Password::get_path_config();
 
         let path = Path::new(config_epass.as_path());
@@ -452,52 +486,35 @@ impl Password {
 
         let error = format!("{}:{}", Password::error_access_message(), display);
         fs::create_dir_all(config_epass).expect(error.trim());
+        fs::create_dir_all(Config::default_storage_keys_path()).expect(error.trim());
     }
 
     pub fn init_save_keys_path(&self) {
-        // let mut config_path = dirs::document_dir().expect(Password::error_access_message());
-        // let config_epass = config_path.join("Keys");
-        let config_epass = Password::get_path_keys();
+        let config_epass = Config::get_path_keys();
         fs::create_dir_all(config_epass).expect(Password::error_access_message());
     }
-
-    // pub fn check_current_pass(&self) {
-    //     let storage_keys_path = Password::get_path_config_keys();
-    //     let hash_file = Path::new(storage_keys_path.as_path());
-
-    //     if (hash_file.exists() == false) {
-    //         Password::tm_clear();
-    //         println!("{}", "About:".bold());
-    //         println!("{}","epass is a simple and secure program for saving, viewing, and managing passwords locally and offline");
-    //         println!("repo: {}", "https://github.com/parsgit/epass");
-    //         println!("version: {}\n\n", "1.0.0".bold());
-
-    //         self.config_the_storage_keys();
-    //         // print!("{}", "Enter your password: ".yellow());
-    //         // stdout().flush().unwrap();
-
-    //         // let password = Password::get_input("");
-
-    //         // let password2 = rpassword::prompt_password("Repeat the password: ").unwrap();
-
-    //         // if (password.trim() == password2.trim()) {
-    //         //     Password::tm_clear();
-    //         //     println!("{}\n", "✅ Password saved".green().bold());
-    //         //     Password::main_menu(false);
-    //         // }
-    //     }
-    // }
 
     fn create_new_password(&self) {
         Password::tm_clear();
         println!("{}", "Send 0 to cancel and return to the menu");
         print!("{}", "The title of the new password: ".blue().bold());
         stdout().flush().unwrap();
+
         let name = Password::get_input("");
 
         if name.trim() == "0" {
             self.main_menu(true);
         } else {
+            if Config::get_path_keys().join(name.trim()).exists() {
+                Password::tm_clear();
+                println!(
+                    "{}",
+                    "The password with this title has already been saved".red()
+                );
+                self.main_menu(false);
+                return;
+            }
+
             print!("{}", "Enter your password: ".yellow());
             stdout().flush().unwrap();
 
@@ -505,14 +522,18 @@ impl Password {
 
             let password2 = rpassword::prompt_password("Repeat the password: ").unwrap();
 
-            if (password.trim() == password2.trim()) {
+            if password.trim() == password2.trim() {
                 Password::tm_clear();
 
-                let mut file = File::create(Password::get_path_keys().join(name.trim())).unwrap();
+                let mut file = File::create(Config::get_path_keys().join(name.trim())).unwrap();
                 let ciphertext = Config::encode(&self.password, &password);
                 file.write_all(&ciphertext.as_bytes()).unwrap();
 
                 println!("{}\n", "✅ Password saved".green().bold());
+            } else {
+                Password::tm_clear();
+                println!("{}", "The password does not match its repetition".red());
+                self.main_menu(false);
             }
         }
     }
