@@ -112,16 +112,17 @@ impl Config {
         let mut zip = ZipWriter::new(file);
         // zip.set
 
-        Config::add_dir_to_zip(path.as_path(), &mut zip, &path);
+        let _ = Config::add_dir_to_zip(path.as_path(), &mut zip, &path);
 
-        zip.finish();
+        let _ = zip.finish();
 
         let password_file = Config::config_file_password_hash_path();
         let hash = Config::read_text_file(password_file);
         let first_30_chars = &hash[0..29];
 
-        Config::encrypt_file(first_30_chars, &file_name.as_str(), file_name_epass.display().to_string().as_str());
-        // Config::decrypt_file("123456", &file_name_epass.as_str(), file_name_epasstest.as_str());
+        let _ = Config::encrypt_file(first_30_chars, &file_name.as_str(), file_name_epass.display().to_string().as_str());
+        fs::remove_file(file_name).unwrap();
+        
     }
 
     fn add_dir_to_zip(
