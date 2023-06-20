@@ -16,7 +16,7 @@ use crossterm::{
     terminal::{Clear, ClearType},
     ExecutableCommand,
 };
-use sha2::{Digest, Sha256};
+// use sha2::{Digest, Sha256};
 
 // use aes_gcm::{
 //     aead::{Aead, AeadCore, KeyInit, OsRng},
@@ -32,24 +32,13 @@ use crossterm::{
 use std::time::Duration;
 use std::{thread, time};
 
-use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng},
-    Aes256Gcm, Key, Nonce,
-};
+// use aes_gcm::{
+//     aead::{Aead, AeadCore, KeyInit, OsRng},
+//     Aes256Gcm, Key, Nonce,
+// };
 
-use hex;
-
-// mod config;
-// use config;
-
-// mod crate::config;
 use crate::config::Config;
 
-// use crate::config::Config;
-// use aes_gcm::{Aead, Aes256Gcm, Key, Nonce};
-// use rand::rngs::OsRng;
-// use rand::RngCore;
-// use std::convert::TryInto;
 
 pub struct Password {
     password: String,
@@ -125,6 +114,32 @@ impl Password {
         return result;
     }
 
+    fn manage_menu(&self, number: i8) {
+        if number == 1 {
+            let mut list = self.show_list_of_passwords();
+            self.get_password_index_and_show_content(&mut list);
+        } else if number == 2 {
+            self.create_new_password();
+        }
+        else if number == 3{
+            self.edit_a_password();
+        }
+         else if number == 4 {
+            self.delete_a_password();
+        } else if number == 5 {
+            Password::tm_clear();
+            Password::login_by_password();
+            self.main_menu(true);
+        }
+        else if number == 6{
+            // Config::export();
+        }
+         else if number == 8 {
+            println!("{}", "Goodbay.".bold());
+            std::process::exit(0);
+        }
+    }
+
     pub fn main_menu(&self, auto_clear: bool) {
         if auto_clear {
             Password::tm_clear();
@@ -134,10 +149,10 @@ impl Password {
             println!("{}", "2) Add Password".bold());
             println!("{}", "3) Edit Password".bold());
             println!("{}", "4) Delete Password".bold());
-            println!("6) Change Main Password");
-            println!("5) Export");
-            println!("5) Import");
-            println!("7) Exit");
+            println!("5) Change Main Password");
+            println!("6) Export");
+            println!("7) Import");
+            println!("8) Exit");
             print!("\n{}", "Please select an option: ".cyan());
             stdout().flush().unwrap();
 
@@ -149,7 +164,7 @@ impl Password {
 
             match result.trim().parse::<i8>() {
                 Ok(num) => {
-                    if num >= 1 && num <= 6 {
+                    if num >= 1 && num <= 8 {
                         // چک کردن عدد در محدوده مورد نظر
                         self.manage_menu(num);
                         break;
@@ -258,7 +273,7 @@ impl Password {
 
         println!("\npassword:{}\n", password.content.bold());
 
-        let mut seconds = 10;
+        let mut seconds = 15;
         let mut stdout = stdout();
 
         execute!(stdout, cursor::Hide).unwrap();
@@ -331,21 +346,7 @@ impl Password {
         stdout.execute(Clear(ClearType::All)).unwrap();
     }
 
-    fn manage_menu(&self, number: i8) {
-        if number == 1 {
-            let mut list = self.show_list_of_passwords();
-            self.get_password_index_and_show_content(&mut list);
-        } else if number == 2 {
-            self.create_new_password();
-        } else if number == 4 {
-            self.delete_a_password();
-        } else if number == 5 {
-            // self.config_the_storage_keys();
-        } else if number == 6 {
-            println!("{}", "Goodbay.".bold());
-            std::process::exit(0);
-        }
-    }
+
 
     pub fn delete_a_password(&self) {
         let mut list = self.show_list_of_passwords();
@@ -406,6 +407,71 @@ impl Password {
         }
     }
 
+
+
+    pub fn edit_a_password(&self) {
+        let mut list = self.show_list_of_passwords();
+        print!(
+            "\nEnter the password number to edit: ",
+        );
+        stdout().flush().unwrap();
+
+        let mut number_string = String::new();
+
+        stdin().read_line(&mut number_string).unwrap();
+
+        let number = match number_string.trim().parse::<i16>() {
+            Ok(p) => p,
+            Err(_) => {
+                Password::tm_clear();
+                println!("{}","The entered expression is not correct. You must enter the password number as a number".red());
+                self.main_menu(false);
+                return;
+            }
+        };
+
+        let item = self.find_password_by_index(number, &mut list, false);
+
+        match item {
+            Some(item) => {
+                let mut rng = rand::thread_rng();
+
+                println!("(You are editing the password '{}')", item.name.bold());
+                print!("Enter new password to edit {}: ",item.name.bold());
+                stdout().flush().unwrap();
+
+                // let mut get_new_pass = String::new();
+                // stdin().read_line(&mut get_new_pass).unwrap();
+                let password = Password::get_input("");
+
+                let password2 = rpassword::prompt_password("Repeat the password: ").unwrap();
+    
+                if password.trim() == password2.trim() {
+                    Password::tm_clear();
+    
+                    let mut file = File::create(Config::get_path_keys().join(item.name.trim())).unwrap();
+                    let ciphertext = Config::encode(&self.password, &password);
+                    file.write_all(&ciphertext.as_bytes()).unwrap();
+
+                    Password::tm_clear();
+                    println!("The password for {} was edited",item.name.green().bold());
+                    self.main_menu(false);
+                    return;
+                } else {
+                    Password::tm_clear();
+                    println!("{}", "The password does not match its repetition".red());
+                    self.main_menu(false);
+                }
+            }
+            None => {
+                Password::tm_clear();
+                println!("{}", "Password not found".red());
+                self.main_menu(false);
+                return;
+            }
+        }
+    }
+
     fn error_access_message() -> &'static str {
         "Access Denied: Unable to create file or directory."
     }
@@ -415,69 +481,6 @@ impl Password {
         return config_path.join("epass");
     }
 
-    fn get_path_config_keys() -> PathBuf {
-        Password::get_path_config().join("storage_kyes_path")
-    }
-
-    // pub fn get_path_default_documents() -> PathBuf {
-    //     let documents = dirs::home_dir().unwrap().join("Documents");
-    //     return documents;
-    // }
-
-    // pub fn get_path_keys() -> PathBuf {
-    //     let file = Password::get_path_config_keys();
-    //     let content = fs::read_to_string(file).unwrap();
-    //     return Path::new(content.trim()).to_path_buf();
-    // }
-
-    // pub fn config_the_storage_keys(&self) {
-    //     let mut first = true;
-
-    //     Password::tm_clear();
-
-    //     loop {
-    //         println!(
-    //             "Select the password storage location (all information will be stored encrypted)"
-    //         );
-    //         println!(
-    //             " {}",
-    //             "1. Set default save location to Documents/Keys".bold()
-    //         );
-    //         println!(" {}", "2. Set custom save location".bold());
-    //         print!("{}", "Choose an option: ".blue());
-    //         stdout().flush().unwrap();
-
-    //         let mut choice = String::new();
-    //         stdin().read_line(&mut choice).expect("Failed to read line");
-
-    //         match choice.trim().parse::<i8>() {
-    //             Ok(num) => {
-    //                 if num == 1 {
-    //                     let keys_path = Password::get_path_default_documents().join("Keys");
-    //                     let keys_path_config_file_path = Password::get_path_config_keys();
-
-    //                     let mut file = File::create(keys_path_config_file_path).unwrap();
-    //                     file.write_all(keys_path.as_path().display().to_string().as_bytes())
-    //                         .unwrap();
-
-    //                     self.main_menu(true);
-    //                     break;
-    //                 } else if num == 2 {
-    //                 } else {
-    //                     Password::tm_clear();
-
-    //                     println!("{}", "Invalid input, please select 1 or 2".red());
-    //                 }
-    //             }
-    //             Err(_) => {
-    //                 Password::tm_clear();
-
-    //                 println!("{}", "Invalid input, please select 1 or 2".red());
-    //             }
-    //         }
-    //     }
-    // }
-
     pub fn init_config() {
         let config_epass = Password::get_path_config();
 
@@ -486,13 +489,9 @@ impl Password {
 
         let error = format!("{}:{}", Password::error_access_message(), display);
         fs::create_dir_all(config_epass).expect(error.trim());
-        fs::create_dir_all(Config::default_storage_keys_path()).expect(error.trim());
+        fs::create_dir_all(Config::get_path_keys()).expect(error.trim());
     }
 
-    pub fn init_save_keys_path(&self) {
-        let config_epass = Config::get_path_keys();
-        fs::create_dir_all(config_epass).expect(Password::error_access_message());
-    }
 
     fn create_new_password(&self) {
         Password::tm_clear();
@@ -529,7 +528,9 @@ impl Password {
                 let ciphertext = Config::encode(&self.password, &password);
                 file.write_all(&ciphertext.as_bytes()).unwrap();
 
+                Password::tm_clear();
                 println!("{}\n", "✅ Password saved".green().bold());
+                self.main_menu(false);
             } else {
                 Password::tm_clear();
                 println!("{}", "The password does not match its repetition".red());

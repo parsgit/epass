@@ -4,6 +4,8 @@
 mod config;
 mod password;
 
+use std::ffi::CString;
+
 use colored::Colorize;
 // use action::Action;
 use password::Password;
@@ -18,19 +20,21 @@ use aes_gcm::{
     Key, // Or `Aes128Gcm`
     Nonce,
 };
-use sha256::digest;
-
-use sha2::{Digest, Sha256};
 
 
 
+// use winapi::
+
+use std::io::{self, Write};
+// extern crate chcp;
 fn main() {
 
     Password::init_config();
     let get_password = Password::get_main_password();
     let pass = Password::new(get_password);
-    
+
     // pass.init_save_keys_path();
-    pass.main_menu(true)
+    pass.main_menu(true);
 
 }
+

@@ -1,21 +1,28 @@
 use std::{
-    fs,
-    path::{Path, PathBuf},
+    fs::{self, File},
+    path::{Path, PathBuf}, os::unix::prelude::OpenOptionsExt,
 };
 
-use sha2::Sha256;
+use chrono::Local;
 // use hex_literal::hex;
 use sha3::{Digest, Sha3_256};
 
 use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng, generic_array::GenericArray},
+    aead::{generic_array::GenericArray, Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Key, Nonce,
 };
+use zip::{write::FileOptions, CompressionMethod, ZipWriter};
+// use zip::write::{FileOptions, ZipWriter};
+// use zip::CompressionMethod;
+
+use aes_gcm::aead::{ AeadInPlace};
+use rand::{Rng, thread_rng};
+use std::fs::{ OpenOptions};
+use std::io::{Read, Write};
 
 pub struct Config {}
 
 impl Config {
-
     pub fn read_file(path: PathBuf) -> Vec<u8> {
         let content = fs::read(path).expect("error read password file content");
         return content;
@@ -48,47 +55,35 @@ impl Config {
         return config_path.join("epass");
     }
 
-    pub fn config_file_storage_path() -> PathBuf {
-        Config::main_config_dir_path().join("storage_kyes_path")
-    }
-
     pub fn config_file_password_hash_path() -> PathBuf {
         Config::main_config_dir_path().join("pass_hash")
     }
 
-    pub fn default_storage_keys_path() -> PathBuf {
-        let documents = dirs::home_dir().unwrap().join("Documents");
-        return documents;
-    }
-
     pub fn get_path_keys() -> PathBuf {
-        let file = Config::config_file_storage_path();
-        let content = fs::read_to_string(file).unwrap();
-        return Path::new(content.trim()).to_path_buf();
+        return Config::main_config_dir_path().join("List");
     }
 
     fn text_to_bytes(text: &str) -> [u8; 32] {
-        let mut hasher = Sha256::new();
+        let mut hasher = Sha3_256::new();
         hasher.update(text.as_bytes());
         hasher.finalize().into()
     }
 
-    pub fn decode(key :&str, ciphertext:Vec<u8>)->String {
-        let text  = String::from_utf8(ciphertext).unwrap();
-        let array:Vec<&str> = text.split(":").collect();
+    pub fn decode(key: &str, ciphertext: Vec<u8>) -> String {
+        let text = String::from_utf8(ciphertext).unwrap();
+        let array: Vec<&str> = text.split(":").collect();
         let nonce_str = array[0];
         let cipher_str = array[1];
 
-        
         let key: &[u8; 32] = &Config::text_to_bytes(key);
         let key: &Key<Aes256Gcm> = key.into();
 
         let cipher = Aes256Gcm::new(&key);
-        
+
         let cd = hex::decode(cipher_str).unwrap();
         let nn = hex::decode(nonce_str).unwrap();
         let nd = GenericArray::from_slice(&nn);
-        
+
         let plaintext = cipher.decrypt(nd, cd.as_ref()).unwrap();
         return std::str::from_utf8(&plaintext).unwrap().to_string();
     }
@@ -102,6 +97,12 @@ impl Config {
 
         let nonce_string = hex::encode(nonce);
 
-         format!("{}:{}",nonce_string, hex::encode(&ciphertext))
+        format!("{}:{}", nonce_string, hex::encode(&ciphertext))
     }
+
+
+
+
+
+
 }
