@@ -5,6 +5,7 @@ use std::{
 
 use std::io::{Read, Write};
 use chrono::Local;
+use colored::Colorize;
 use sha3::{Digest, Sha3_256};
 use aes_gcm::{
     aead::{generic_array::GenericArray, Aead, AeadCore, KeyInit, OsRng},
@@ -122,7 +123,7 @@ impl Config {
 
         let _ = Config::encrypt_file(first_30_chars, &file_name.as_str(), file_name_epass.display().to_string().as_str());
         fs::remove_file(file_name).unwrap();
-        
+        println!("The file was saved in the '{}' path", file_name_epass.display().to_string().bold());
     }
 
     fn add_dir_to_zip(
