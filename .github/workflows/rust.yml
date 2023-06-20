@@ -1,13 +1,8 @@
-name: Rust
-
+name: Build Executable
 on:
   push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
-
-env:
-  CARGO_TERM_COLOR: always
+    branches:
+      - master
 
 jobs:
   build:
