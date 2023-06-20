@@ -132,7 +132,7 @@ impl Password {
             self.main_menu(true);
         }
         else if number == 6{
-            // Config::export();
+            Config::export();
         }
          else if number == 8 {
             println!("{}", "Goodbay.".bold());
