@@ -1,2 +1,0 @@
-- name: Tag And Release Rust binary
-  uses: xhaiker/rust-release.action@v1.0.2
