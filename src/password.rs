@@ -114,6 +114,23 @@ impl Password {
         return result;
     }
 
+    fn re_encrypt_all_passwords(old_password:&str, new_password: &str){
+
+        let list= Password::getKyesFilesList();
+
+        for item in list.iter(){
+            let pass_path = Config::get_path_keys().join(&item.name);
+            let content = Config::read_file(pass_path);
+            let decrypt_string = Config::decode(old_password, content);
+           
+            let ciphertext = Config::encode(new_password, decrypt_string.as_str());
+
+            let mut file = File::create(Config::get_path_keys().join(item.name.trim())).unwrap();
+            file.write_all(&ciphertext.as_bytes()).unwrap();
+        }
+
+    }
+
     fn manage_menu(&self, number: i8) {
         if number == 1 {
             let mut list = self.show_list_of_passwords();
@@ -127,9 +144,12 @@ impl Password {
          else if number == 4 {
             self.delete_a_password();
         } else if number == 5 {
+            let old_password = &self.password;
             Password::tm_clear();
-            Password::login_by_password();
-            self.main_menu(true);
+            let new_password = Password::login_by_password();
+            Password::re_encrypt_all_passwords(old_password.as_str(), new_password.as_str());
+            println!("Password has been changed. Please log in again.");
+            std::process::exit(0);
         }
         else if number == 6{
             Config::export();

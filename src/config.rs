@@ -78,7 +78,7 @@ impl Config {
         let nn = hex::decode(nonce_str).unwrap();
         let nd = GenericArray::from_slice(&nn);
 
-        let plaintext = cipher.decrypt(nd, cd.as_ref()).unwrap();
+        let plaintext = cipher.decrypt(nd, cd.as_ref()).expect("A problem has occurred during decryption. It is possible that your password does not match the encrypted key.");
         return std::str::from_utf8(&plaintext).unwrap().to_string();
     }
 
