@@ -5,51 +5,26 @@ on:
     types: [created]
   push:
     branches: [ "master" ]
-
 jobs:
   release:
-    name: publish ${{ matrix.name }}
+    name: release ${{ matrix.target }}
+    runs-on: ubuntu-latest
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-pc-windows-gnu
-            suffix: windows-x86_64
             archive: zip
-            name: x86_64-pc-windows-gnu
-          - target: x86_64-unknown-linux-gnu
-            suffix: linux-x86_64
-            archive: tar.xz
-            name: x86_64-unknown-linux-gnu
+          - target: x86_64-unknown-linux-musl
+            archive: tar.gz tar.xz tar.zst
           - target: x86_64-apple-darwin
-            suffix: darwin-x86_64
-            archive: tar.gz
-            name: x86_64-apple-darwin
-    runs-on: ubuntu-latest
+            archive: zip
     steps:
-      - name: Clone test repository
-        uses: actions/checkout@v2
-      - uses: xhaiker/rust-release.action@v1.0.0
-        name: build ${{ matrix.name }}
-        if: github.event_name == 'release' && github.event.action == 'created'
-        with:
-          rust_target: ${{ matrix.target }}
-          archive_suffix: ${{ matrix.suffix }}
-          archive_types: ${{ matrix.archive }}
-          extra_files: "README.md README_zh.md LICENSE"
+      - uses: actions/checkout@master
+      - name: Compile and release
+        uses: rust-build/rust-build.action@v1.4.3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Release Asset
-        if: github.event_name == 'release' && github.event.action == 'created'
-        uses: svenstaro/upload-release-action@v2.1.0
         with:
-          file: |
-            target/x86_64-unknown-linux-gnu/release/app-linux-x86_64.tar.xz
-            target/x86_64-apple-darwin/release/app-darwin-x86_64.tar.gz
-            target/x86_64-pc-windows-gnu/release/app-windows-x86_64.zip
-          name: app-$RELEASE_TAG-${{ matrix.name }}
-          tag: ${{ github.ref }}
-          overwrite: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUSTTARGET: ${{ matrix.target }}
+          ARCHIVE_TYPES: ${{ matrix.archive }}
