@@ -1,8 +1,6 @@
 
 # Information about epass software
 
-## ⚠️ Under development.
-
 The epass software is a secure password management application that stores and encrypts information locally. With this console-based program, you can easily create or view new passwords after setting a master password.
 
 The software uses an advanced AES256 encryption algorithm to protect the stored data, ensuring that no unauthorized person has access to it. Please keep in mind that if you lose your master password, there is no way to recover any of your saved passwords. Therefore, it is crucial to remember your master password in order to access your passwords.
