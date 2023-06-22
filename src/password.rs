@@ -110,8 +110,6 @@ impl Password {
             let content = Config::read_file(pass_path);
             
             let decrypt_string = Config::decode(old_password, content);
-
-            println!("pass re:{}", decrypt_string);
            
             let ciphertext = Config::encode(new_password, decrypt_string.as_str());
 
