@@ -1,29 +1,20 @@
 use colored::*;
 use rand::Rng;
 use std::{
-    borrow::Cow,
+
     fs,
     fs::File,
     io::{stdin, stdout, Read},
     path::{Path, PathBuf},
 };
-// use std::io::stdout;
 use rpassword;
 use std::io::Write;
-//use termion::{clear, cursor};
 use crossterm::cursor::{position, MoveTo, MoveToColumn};
 use crossterm::{
     terminal::{Clear, ClearType},
     ExecutableCommand,
 };
-// use sha2::{Digest, Sha256};
 
-// use aes_gcm::{
-//     aead::{Aead, AeadCore, KeyInit, OsRng},
-//     Aes256Gcm,
-//     Key, // Or `Aes128Gcm`
-//     Nonce,
-// };
 use crossterm::{
     cursor, execute,
     style::{Color, Print, SetForegroundColor},
@@ -32,10 +23,6 @@ use crossterm::{
 use std::time::Duration;
 use std::{thread, time};
 
-// use aes_gcm::{
-//     aead::{Aead, AeadCore, KeyInit, OsRng},
-//     Aes256Gcm, Key, Nonce,
-// };
 
 use crate::config::Config;
 
@@ -121,7 +108,10 @@ impl Password {
         for item in list.iter(){
             let pass_path = Config::get_path_keys().join(&item.name);
             let content = Config::read_file(pass_path);
+            
             let decrypt_string = Config::decode(old_password, content);
+
+            println!("pass re:{}", decrypt_string);
            
             let ciphertext = Config::encode(new_password, decrypt_string.as_str());
 
@@ -145,7 +135,7 @@ impl Password {
             self.delete_a_password();
         } else if number == 5 {
             let old_password = &self.password;
-            Password::tm_clear();
+
             let new_password = Password::login_by_password();
             Password::re_encrypt_all_passwords(old_password.as_str(), new_password.as_str());
             println!("Password has been changed. Please log in again.");
@@ -192,7 +182,6 @@ impl Password {
             match result.trim().parse::<i8>() {
                 Ok(num) => {
                     if num >= 1 && num <= 8 {
-                        // چک کردن عدد در محدوده مورد نظر
                         self.manage_menu(num);
                         break;
                     } else {
@@ -244,7 +233,7 @@ impl Password {
         let mut idx = 1;
 
         for file in list.iter() {
-            // println!("{}: {}",file.index ,file.name );
+
 
             print!(" {}.", file.index.to_string().yellow());
             print!("{}     ", file.name.bold());
@@ -259,7 +248,7 @@ impl Password {
         }
 
         list
-        // println!("List {:?}", list);
+
     }
 
     pub fn get_password_index_and_show_content(&self, list: &mut Vec<PasswordItem>) {
@@ -364,7 +353,7 @@ impl Password {
         }
 
         None
-        // return &find;
+
     }
 
     pub fn tm_clear() {
