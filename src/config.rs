@@ -3,16 +3,19 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use std::io::{Read, Write};
-use chrono::Local;
-use colored::Colorize;
-use sha3::{Digest, Sha3_256};
 use aes_gcm::{
     aead::{generic_array::GenericArray, Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Key,
 };
-use zip::{ ZipWriter};
-use rand::{RngCore};
+use chrono::Local;
+use colored::Colorize;
+use rand::RngCore;
+use sha3::{Digest, Sha3_256};
+use std::io::{Read, Write};
+use zip::{ZipWriter, ZipArchive};
+
+use native_dialog::{FileDialog, MessageDialog, MessageType};
+
 
 pub struct Config {}
 
@@ -94,24 +97,26 @@ impl Config {
         format!("{}:{}", nonce_string, hex::encode(&ciphertext))
     }
 
-
     pub fn export() {
         let dt = Local::now();
         let formatted = dt.format("%Y_%m_%d_%H_%M_%S").to_string();
-        let file_name = format!("archive_{}.zip", formatted);
-        
+
         let storage_path = dirs::download_dir();
         let storage_path = match storage_path {
-            Some(p)=>{p}
-            None => { dirs::home_dir().unwrap() },
+            Some(p) => p,
+            None => dirs::home_dir().unwrap(),
         };
 
         let file_name_epass = storage_path.join(format!("archive_{}.epass", formatted));
 
         let path = Config::get_path_keys();
-        let file = File::create(&file_name).unwrap();
-        let mut zip = ZipWriter::new(file);
-        // zip.set
+
+        // create zip file name
+        let zip_file_name = format!("archive_{}.zip", formatted);
+        let zip_file_save_path = storage_path.join(zip_file_name);
+        let zip_file = File::create(&zip_file_save_path).unwrap();
+
+        let mut zip = ZipWriter::new(zip_file);
 
         let _ = Config::add_dir_to_zip(path.as_path(), &mut zip, &path);
 
@@ -121,9 +126,70 @@ impl Config {
         let hash = Config::read_text_file(password_file);
         let first_30_chars = &hash[0..29];
 
-        let _ = Config::encrypt_file(first_30_chars, &file_name.as_str(), file_name_epass.display().to_string().as_str());
-        fs::remove_file(file_name).unwrap();
-        println!("The file was saved in the '{}' path", file_name_epass.display().to_string().bold());
+        let _ = Config::encrypt_file(
+            first_30_chars,
+            &zip_file_save_path.display().to_string().as_str(),
+            file_name_epass.display().to_string().as_str(),
+        );
+        fs::remove_file(zip_file_save_path).unwrap();
+        println!(
+            "The file was saved in the '{}' path",
+            file_name_epass.display().to_string().bold()
+        );
+    }
+
+    pub fn import() ->bool{
+
+        // Open Dialog for select backup file
+        let path = FileDialog::new()
+            .set_location(dirs::home_dir().unwrap().as_path())
+            .add_filter("Epass file", &["epass"])
+            .show_open_single_file()
+            .unwrap();
+
+        let path = match path {
+            Some(path) => path,
+            None => {
+                return false;
+            },
+        };
+
+        // get orginal backup file name
+        let file_name = path.file_name().unwrap().to_string_lossy().to_string();
+
+        // create zip file name
+        let zip_file_name = file_name.replace("epass", "zip");
+
+
+        // get password hash path
+        let password_file = Config::config_file_password_hash_path();
+
+        // get password hash string
+        let hash = Config::read_text_file(password_file);
+
+        // use first 30 chars of hash
+        let first_30_chars = &hash[0..29];
+
+
+        // init storage zip path
+        let storage_path = dirs::download_dir();
+        let storage_path = match storage_path {
+            Some(p) => p,
+            None => dirs::home_dir().unwrap(),
+        };
+
+        // create zip storage path with file name
+        let zip_file_path = storage_path.join(zip_file_name);
+        
+        // decrypt backup file and make zip
+        Config::decrypt_file(first_30_chars, path.display().to_string().as_str(),zip_file_path.display().to_string().as_str());
+
+
+        let extract_passwords_list_path = Config::get_path_keys();
+
+        Config::unzip_file(zip_file_path.as_path(), extract_passwords_list_path.as_path());
+
+        true
     }
 
     fn add_dir_to_zip(
@@ -146,6 +212,31 @@ impl Config {
             }
         }
 
+        Ok(())
+    }
+
+    fn unzip_file(zip_file_path: &Path, dest_dir_path: &Path) -> std::io::Result<()> {
+        let file = File::open(zip_file_path)?;
+        let mut archive = ZipArchive::new(file)?;
+    
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i)?;
+            let outpath = match file.enclosed_name() {
+                Some(path) => path.to_owned(),
+                None => continue,
+            };
+    
+            let mut outpath = dest_dir_path.to_path_buf().join(outpath);
+            if let Some(p) = outpath.parent() {
+                if !p.exists() {
+                    fs::create_dir_all(&p)?;
+                }
+            }
+    
+            let mut outfile = File::create(&outpath)?;
+            std::io::copy(&mut file, &mut outfile)?;
+        }
+    
         Ok(())
     }
 
@@ -195,27 +286,24 @@ impl Config {
         // Read the input file
         let input_data = match Config::c_read_file(input_path) {
             Ok(data) => data,
-            Err(e) => return Err(format!("Error reading input file: {}", e))
+            Err(e) => return Err(format!("Error reading input file: {}", e)),
         };
-
 
         // Split the input data into nonce and ciphertext
         let nonce_size = 12; // We're using a 96-bit nonce
         let nonce = &input_data[..nonce_size];
         let ciphertext = &input_data[nonce_size..];
 
-
         let cipher = Aes256Gcm::new(key);
         let plaintext = match cipher.decrypt(GenericArray::from_slice(nonce), ciphertext) {
             Ok(data) => data,
-            Err(e) => return Err(format!("Decryption error: {}", e))
+            Err(e) => return Err(format!("Decryption error: {}", e)),
         };
-
 
         // Write the decrypted data to the output file
         match Config::c_write_file(output_path, &plaintext) {
             Ok(_) => Ok(()),
-            Err(e) => Err(format!("Error writing decrypted data to file: {}", e))
+            Err(e) => Err(format!("Error writing decrypted data to file: {}", e)),
         }
     }
 

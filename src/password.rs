@@ -64,7 +64,7 @@ impl Password {
         let path = password_file.as_path();
 
         if path.exists() {
-            let pass = rpassword::prompt_password("Enter main password: ").unwrap();
+            let pass = rpassword::prompt_password("Enter main password:").unwrap();
             let hash = Config::read_text_file(password_file);
             let user_enter_pass_hash = Config::make_password_hash(&pass);
 
@@ -83,8 +83,8 @@ impl Password {
         loop {
             println!("{}\n", "For the first time, users need to set a master password in order to access all of their saved passwords.".bold());
 
-            let password1 = rpassword::prompt_password("Enter main password: ").unwrap();
-            let password2 = rpassword::prompt_password("Repeat the password: ").unwrap();
+            let password1 = rpassword::prompt_password("Enter main password:").unwrap();
+            let password2 = rpassword::prompt_password("Repeat the password:").unwrap();
 
             if password1 == password2 {
                 let config_path = Config::config_file_password_hash_path();
@@ -153,6 +153,13 @@ impl Password {
         }
         else if number == 6{
             Config::export();
+        }
+        else if number == 7{
+            if Config::import(){
+                Password::tm_clear();
+                println!("{}\n", "Import was successful".green().bold());
+                self.main_menu(false);
+            }
         }
          else if number == 8 {
             println!("{}", "Goodbay.".bold());
@@ -397,7 +404,7 @@ impl Password {
                 let mut rng = rand::thread_rng();
                 let src: String = (0..4).map(|_| rng.gen_range(0..=9).to_string()).collect();
                 println!("(You are removing the password named '{}')", item.name.bold());
-                print!("Send the number {} to remove the password: ",src);
+                print!("Send the number {} to remove the password:",src);
                 stdout().flush().unwrap();
 
                 let mut get_sec = String::new();
@@ -450,18 +457,16 @@ impl Password {
             }
         };
 
-        let item = self.find_password_by_index(number, &mut list, false);
+        let item = self.find_password_by_index(number, &mut list, true);
 
         match item {
             Some(item) => {
-                let mut rng = rand::thread_rng();
 
-                println!("(You are editing the password '{}')", item.name.bold());
-                print!("Enter new password to edit {}: ",item.name.bold());
+                println!("Current password {}: {}",item.name.bold(), item.content);
+                print!("Enter new password to edit {}:",item.name.bold());
                 stdout().flush().unwrap();
 
-                // let mut get_new_pass = String::new();
-                // stdin().read_line(&mut get_new_pass).unwrap();
+
                 let password = Password::get_input("");
 
                 let password2 = rpassword::prompt_password("Repeat the password: ").unwrap();
@@ -474,7 +479,7 @@ impl Password {
                     file.write_all(&ciphertext.as_bytes()).unwrap();
 
                     Password::tm_clear();
-                    println!("The password for {} was edited",item.name.green().bold());
+                    println!("{} {} {}\n","The password for".green(),item.name.green().bold(),"was edited".green());
                     self.main_menu(false);
                     return;
                 } else {
@@ -516,7 +521,7 @@ impl Password {
     fn create_new_password(&self) {
         Password::tm_clear();
         println!("{}", "Send 0 to cancel and return to the menu");
-        print!("{}", "The title of the new password: ".blue().bold());
+        print!("{}", "The title of the new password:".blue().bold());
         stdout().flush().unwrap();
 
         let name = Password::get_input("");
@@ -534,12 +539,12 @@ impl Password {
                 return;
             }
 
-            print!("{}", "Enter your password: ".yellow());
+            print!("{}", "Enter your password:".yellow());
             stdout().flush().unwrap();
 
             let password = Password::get_input("");
 
-            let password2 = rpassword::prompt_password("Repeat the password: ").unwrap();
+            let password2 = rpassword::prompt_password("Repeat the password:").unwrap();
 
             if password.trim() == password2.trim() {
                 Password::tm_clear();
