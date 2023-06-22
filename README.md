@@ -1,7 +1,7 @@
 
 # Information about epass software
 
-## Under development. ⚠️
+## ⚠️ Under development.
 
 The epass software is a secure password management application that stores and encrypts information locally. With this console-based program, you can easily create or view new passwords after setting a master password.
 
