@@ -13,7 +13,4 @@ This ensures that even if someone gains access to your backup file, they won't b
 
 However, in any case, you should never expose your sensitive files to the public or leave them unsecured where others may find them. It is always recommended to take necessary precautions such as storing backups in a secure location and using strong passwords to protect your important data.
 
-### Download links:
 
- - [Download for Windows](https://github.com/parsgit/epass/releases/download/1.0.0/epass-win-x64_86.zip)
- - [Download for Linux](https://github.com/parsgit/epass/releases/download/1.0.0/epass-linux-x64_86.zip)
