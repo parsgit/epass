@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File},
-    path::{Path, PathBuf},
+    path::{Path, PathBuf}, process::exit, io::stdin, alloc::System,
 };
 
 use aes_gcm::{
@@ -10,11 +10,13 @@ use aes_gcm::{
 use chrono::Local;
 use colored::Colorize;
 use rand::RngCore;
-use sha3::{Digest, Sha3_256};
+use sha3::{Digest, Sha3_256, digest::typenum::Same};
 use std::io::{Read, Write};
 use zip::{ZipWriter, ZipArchive};
 
 use native_dialog::{FileDialog, MessageDialog, MessageType};
+
+use crate::password::Password;
 
 
 pub struct Config {}
@@ -145,14 +147,24 @@ impl Config {
             .set_location(dirs::home_dir().unwrap().as_path())
             .add_filter("Epass file", &["epass"])
             .show_open_single_file()
-            .unwrap();
+            ;
 
         let path = match path {
-            Some(path) => path,
-            None => {
-                return false;
+            Ok(path) => path.unwrap(),
+            Err(_) => {
+                println!("Please send epass file path:");
+                let mut path = String::new();
+                stdin().read_line(&mut path).unwrap();
+                Path::new(&path).to_path_buf()
             },
         };
+
+        if path.exists() == false {
+            println!("{}", "File not found".red());
+            std::process::exit(0);
+        }
+
+
 
         // get orginal backup file name
         let file_name = path.file_name().unwrap().to_string_lossy().to_string();
