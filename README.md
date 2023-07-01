@@ -18,4 +18,7 @@ This ensures that even if someone gains access to your backup file, they won't b
 
 However, in any case, you should never expose your sensitive files to the public or leave them unsecured where others may find them. It is always recommended to take necessary precautions such as storing backups in a secure location and using strong passwords to protect your important data.
 
+This program consists of binary files that are available for download on Linux and Windows operating systems.
+
+
 
