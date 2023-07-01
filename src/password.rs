@@ -1,18 +1,17 @@
 use colored::*;
-use rand::Rng;
-use std::{
-
-    fs,
-    fs::File,
-    io::{stdin, stdout, Read},
-    path::{Path, PathBuf},
-};
-use rpassword;
-use std::io::Write;
 use crossterm::cursor::{position, MoveTo, MoveToColumn};
 use crossterm::{
     terminal::{Clear, ClearType},
     ExecutableCommand,
+};
+use rand::Rng;
+use rpassword;
+use std::io::Write;
+use std::{
+    fs,
+    fs::File,
+    io::{stdin, stdout, Read},
+    path::{Path, PathBuf},
 };
 
 use crossterm::{
@@ -23,9 +22,7 @@ use crossterm::{
 use std::time::Duration;
 use std::{thread, time};
 
-
 use crate::config::Config;
-
 
 pub struct Password {
     password: String,
@@ -45,7 +42,6 @@ impl Password {
 
     pub fn get_main_password() -> String {
         Password::tm_clear();
-
 
         let password_file = Config::config_file_password_hash_path();
         let path = password_file.as_path();
@@ -101,22 +97,20 @@ impl Password {
         return result;
     }
 
-    fn re_encrypt_all_passwords(old_password:&str, new_password: &str){
+    fn re_encrypt_all_passwords(old_password: &str, new_password: &str) {
+        let list = Password::getKyesFilesList();
 
-        let list= Password::getKyesFilesList();
-
-        for item in list.iter(){
+        for item in list.iter() {
             let pass_path = Config::get_path_keys().join(&item.name);
             let content = Config::read_file(pass_path);
-            
+
             let decrypt_string = Config::decode(old_password, content);
-           
+
             let ciphertext = Config::encode(new_password, decrypt_string.as_str());
 
             let mut file = File::create(Config::get_path_keys().join(item.name.trim())).unwrap();
             file.write_all(&ciphertext.as_bytes()).unwrap();
         }
-
     }
 
     fn manage_menu(&self, number: i8) {
@@ -125,11 +119,9 @@ impl Password {
             self.get_password_index_and_show_content(&mut list);
         } else if number == 2 {
             self.create_new_password();
-        }
-        else if number == 3{
+        } else if number == 3 {
             self.edit_a_password();
-        }
-         else if number == 4 {
+        } else if number == 4 {
             self.delete_a_password();
         } else if number == 5 {
             let old_password = &self.password;
@@ -138,18 +130,15 @@ impl Password {
             Password::re_encrypt_all_passwords(old_password.as_str(), new_password.as_str());
             println!("Password has been changed. Please log in again.");
             std::process::exit(0);
-        }
-        else if number == 6{
+        } else if number == 6 {
             Config::export();
-        }
-        else if number == 7{
-            if Config::import(){
+        } else if number == 7 {
+            if Config::import() {
                 Password::tm_clear();
                 println!("{}\n", "Import was successful".green().bold());
                 self.main_menu(false);
             }
-        }
-         else if number == 8 {
+        } else if number == 8 {
             println!("{}", "Goodbay.".bold());
             std::process::exit(0);
         }
@@ -231,8 +220,6 @@ impl Password {
         let mut idx = 1;
 
         for file in list.iter() {
-
-
             print!(" {}.", file.index.to_string().yellow());
             print!("{}     ", file.name.bold());
             if idx % 3 == 0 {
@@ -246,7 +233,6 @@ impl Password {
         }
 
         list
-
     }
 
     pub fn get_password_index_and_show_content(&self, list: &mut Vec<PasswordItem>) {
@@ -327,7 +313,7 @@ impl Password {
         &self,
         index: i16,
         list: &mut Vec<PasswordItem>,
-        decode: bool
+        decode: bool,
     ) -> Option<PasswordItem> {
         let mut find = PasswordItem {
             name: "".to_string(),
@@ -342,7 +328,7 @@ impl Password {
 
                 find.name = pass.name.clone();
                 find.index = pass.index;
-                if decode{
+                if decode {
                     find.content = Config::decode(self.password.as_str(), content).to_string();
                 }
 
@@ -351,7 +337,6 @@ impl Password {
         }
 
         None
-
     }
 
     pub fn tm_clear() {
@@ -360,13 +345,12 @@ impl Password {
         stdout.execute(Clear(ClearType::All)).unwrap();
     }
 
-
-
     pub fn delete_a_password(&self) {
         let mut list = self.show_list_of_passwords();
         print!(
             "\n{}{}: ",
-            "Enter the password number to ".bright_purple(),"delete".bold().red()
+            "Enter the password number to ".bright_purple(),
+            "delete".bold().red()
         );
         stdout().flush().unwrap();
 
@@ -390,24 +374,26 @@ impl Password {
             Some(item) => {
                 let mut rng = rand::thread_rng();
                 let src: String = (0..4).map(|_| rng.gen_range(0..=9).to_string()).collect();
-                println!("(You are removing the password named '{}')", item.name.bold());
-                print!("Send the number {} to remove the password:",src);
+                println!(
+                    "(You are removing the password named '{}')",
+                    item.name.bold()
+                );
+                print!("Send the number {} to remove the password:", src);
                 stdout().flush().unwrap();
 
                 let mut get_sec = String::new();
                 stdin().read_line(&mut get_sec).unwrap();
-                
-                if src.trim() == get_sec.trim(){
+
+                if src.trim() == get_sec.trim() {
                     fs::remove_file(Config::get_path_keys().join(item.name)).unwrap();
 
                     Password::tm_clear();
-                    println!("{}","Password removed".green().bold());
+                    println!("{}", "Password removed".green().bold());
                     self.main_menu(false);
                     return;
-                }
-                else{
+                } else {
                     Password::tm_clear();
-                    println!("{}","The security number sent was incorrect".red());
+                    println!("{}", "The security number sent was incorrect".red());
                     self.main_menu(false);
                     return;
                 }
@@ -421,13 +407,9 @@ impl Password {
         }
     }
 
-
-
     pub fn edit_a_password(&self) {
         let mut list = self.show_list_of_passwords();
-        print!(
-            "\nEnter the password number to edit: ",
-        );
+        print!("\nEnter the password number to edit: ",);
         stdout().flush().unwrap();
 
         let mut number_string = String::new();
@@ -448,25 +430,29 @@ impl Password {
 
         match item {
             Some(item) => {
-
-                println!("Current password {}: {}",item.name.bold(), item.content);
-                print!("Enter new password to edit {}:",item.name.bold());
+                println!("Current password {}: {}", item.name.bold(), item.content);
+                print!("Enter new password to edit {}:", item.name.bold());
                 stdout().flush().unwrap();
-
 
                 let password = Password::get_input("");
 
                 let password2 = rpassword::prompt_password("Repeat the password: ").unwrap();
-    
+
                 if password.trim() == password2.trim() {
                     Password::tm_clear();
-    
-                    let mut file = File::create(Config::get_path_keys().join(item.name.trim())).unwrap();
+
+                    let mut file =
+                        File::create(Config::get_path_keys().join(item.name.trim())).unwrap();
                     let ciphertext = Config::encode(&self.password, &password);
                     file.write_all(&ciphertext.as_bytes()).unwrap();
 
                     Password::tm_clear();
-                    println!("{} {} {}\n","The password for".green(),item.name.green().bold(),"was edited".green());
+                    println!(
+                        "{} {} {}\n",
+                        "The password for".green(),
+                        item.name.green().bold(),
+                        "was edited".green()
+                    );
                     self.main_menu(false);
                     return;
                 } else {
@@ -504,10 +490,9 @@ impl Password {
         fs::create_dir_all(Config::get_path_keys()).expect(error.trim());
     }
 
-
     fn create_new_password(&self) {
         Password::tm_clear();
-        println!("{}", "Send 0 to cancel and return to the menu");
+        println!("{}", "0) Back");
         print!("{}", "The title of the new password:".blue().bold());
         stdout().flush().unwrap();
 
@@ -526,14 +511,34 @@ impl Password {
                 return;
             }
 
+            println!("{}", "0) Back");
+            println!("{}", "1) Generate a random password");
             print!("{}", "Enter your password:".yellow());
             stdout().flush().unwrap();
 
-            let password = Password::get_input("");
 
-            let password2 = rpassword::prompt_password("Repeat the password:").unwrap();
+            let mut password = Password::get_input("");
+            let mut password2 = String::new();
+            let mut force = false;
 
-            if password.trim() == password2.trim() {
+            if password.trim() == "0"{
+                self.main_menu(true);
+            }
+            else if password.trim() =="1"{
+
+                let mut generate_password = self.generate_random_password(12);
+                self.confirm_random_password(&mut generate_password);
+
+                password = generate_password;
+                force = true;
+            }
+            else{
+                password2 = rpassword::prompt_password("Repeat the password:").unwrap();
+            }
+
+
+
+            if password.trim() == password2.trim() || force {
                 Password::tm_clear();
 
                 let mut file = File::create(Config::get_path_keys().join(name.trim())).unwrap();
@@ -548,6 +553,35 @@ impl Password {
                 println!("{}", "The password does not match its repetition".red());
                 self.main_menu(false);
             }
+        }
+    }
+
+    fn generate_random_password(&self, length: usize) -> String {
+        let characters: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ12345678904";
+        let mut rng = rand::thread_rng();
+        let password: String = (0..length)
+            .map(|_| {
+                let index = rng.gen_range(0..characters.len());
+                characters[index] as char
+            })
+            .collect();
+        password
+    }
+
+    fn confirm_random_password(&self,password :&mut String){
+
+        println!("Password created to use:{}", password.bold().blue());
+
+        println!("If you have copied this password and want to use it, send the number '1'. If you want another random password to be generated, send the number '2'");
+        print!("Confirm and continue password (default 1):");
+        stdout().flush().unwrap();
+
+        let mut answer = String::new();
+        stdin().read_line(&mut answer).unwrap();
+
+        if answer.trim()=="2"{
+            *password = self.generate_random_password(14);
+            self.confirm_random_password(password);
         }
     }
 }
