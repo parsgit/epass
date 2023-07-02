@@ -1,6 +1,9 @@
 use std::{
+    alloc::System,
     fs::{self, File},
-    path::{Path, PathBuf}, process::exit, io::stdin, alloc::System,
+    io::stdin,
+    path::{Path, PathBuf},
+    process::exit,
 };
 
 use aes_gcm::{
@@ -10,14 +13,13 @@ use aes_gcm::{
 use chrono::Local;
 use colored::Colorize;
 use rand::RngCore;
-use sha3::{Digest, Sha3_256, digest::typenum::Same};
+use sha3::{digest::typenum::Same, Digest, Sha3_256};
 use std::io::{Read, Write};
-use zip::{ZipWriter, ZipArchive};
+use zip::{ZipArchive, ZipWriter};
 
 use native_dialog::{FileDialog, MessageDialog, MessageType};
 
 use crate::password::Password;
-
 
 pub struct Config {}
 
@@ -140,38 +142,45 @@ impl Config {
         );
     }
 
-    pub fn import() ->bool{
-
+    pub fn import() -> bool {
         // Open Dialog for select backup file
         let path = FileDialog::new()
             .set_location(dirs::home_dir().unwrap().as_path())
             .add_filter("Epass file", &["epass"])
-            .show_open_single_file()
-            ;
+            .show_open_single_file();
 
         let path = match path {
-            Ok(path) => path.unwrap(),
+            Ok(path) => path,
             Err(_) => {
                 println!("Please send epass file path:");
                 let mut path = String::new();
                 stdin().read_line(&mut path).unwrap();
-                Path::new(&path).to_path_buf()
-            },
+                Some(Path::new(&path).to_path_buf())
+            }
         };
+
+        let ok = match path {
+            Some(_) => true,
+            None => false,
+        };
+
+        if ok == false {
+            return false;
+        }
+
+        let path = path.unwrap();
+        // }
 
         if path.exists() == false {
             println!("{}", "File not found".red());
             std::process::exit(0);
         }
 
-
-
         // get orginal backup file name
         let file_name = path.file_name().unwrap().to_string_lossy().to_string();
 
         // create zip file name
         let zip_file_name = file_name.replace("epass", "zip");
-
 
         // get password hash path
         let password_file = Config::config_file_password_hash_path();
@@ -182,7 +191,6 @@ impl Config {
         // use first 30 chars of hash
         let first_30_chars = &hash[0..29];
 
-
         // init storage zip path
         let storage_path = dirs::download_dir();
         let storage_path = match storage_path {
@@ -192,14 +200,20 @@ impl Config {
 
         // create zip storage path with file name
         let zip_file_path = storage_path.join(zip_file_name);
-        
-        // decrypt backup file and make zip
-        Config::decrypt_file(first_30_chars, path.display().to_string().as_str(),zip_file_path.display().to_string().as_str());
 
+        // decrypt backup file and make zip
+        Config::decrypt_file(
+            first_30_chars,
+            path.display().to_string().as_str(),
+            zip_file_path.display().to_string().as_str(),
+        );
 
         let extract_passwords_list_path = Config::get_path_keys();
 
-        Config::unzip_file(zip_file_path.as_path(), extract_passwords_list_path.as_path());
+        Config::unzip_file(
+            zip_file_path.as_path(),
+            extract_passwords_list_path.as_path(),
+        );
 
         true
     }
@@ -230,25 +244,25 @@ impl Config {
     fn unzip_file(zip_file_path: &Path, dest_dir_path: &Path) -> std::io::Result<()> {
         let file = File::open(zip_file_path)?;
         let mut archive = ZipArchive::new(file)?;
-    
+
         for i in 0..archive.len() {
             let mut file = archive.by_index(i)?;
             let outpath = match file.enclosed_name() {
                 Some(path) => path.to_owned(),
                 None => continue,
             };
-    
+
             let mut outpath = dest_dir_path.to_path_buf().join(outpath);
             if let Some(p) = outpath.parent() {
                 if !p.exists() {
                     fs::create_dir_all(&p)?;
                 }
             }
-    
+
             let mut outfile = File::create(&outpath)?;
             std::io::copy(&mut file, &mut outfile)?;
         }
-    
+
         Ok(())
     }
 
