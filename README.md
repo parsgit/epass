@@ -21,4 +21,7 @@ However, in any case, you should never expose your sensitive files to the public
 This program consists of binary files that are available for download on Linux and Windows operating systems.
 
 
+## [Download linux version](https://github.com/parsgit/epass/releases/download/1.0.3/epass-linux.zip)
+
+## [Download windows version](https://github.com/parsgit/epass/releases/download/1.0.3/epass-linux.zip)
 
