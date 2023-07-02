@@ -236,7 +236,7 @@ impl Password {
     }
 
     pub fn get_password_index_and_show_content(&self, list: &mut Vec<PasswordItem>) {
-        println!("\n{}", "Send 0 to cancel and return to the menu");
+        println!("\n{}", "0) Back");
         print!("{}", "Please send password number: ".bold());
         stdout().flush().unwrap();
 
@@ -348,7 +348,7 @@ impl Password {
     pub fn delete_a_password(&self) {
         let mut list = self.show_list_of_passwords();
         print!(
-            "\n{}{}: ",
+            "\nO) Back\n{}{}: ",
             "Enter the password number to ".bright_purple(),
             "delete".bold().red()
         );
@@ -409,7 +409,8 @@ impl Password {
 
     pub fn edit_a_password(&self) {
         let mut list = self.show_list_of_passwords();
-        print!("\nEnter the password number to edit: ",);
+        // println!("");
+        print!("\n0) Back\nEnter the password number to edit: ",);
         stdout().flush().unwrap();
 
         let mut number_string = String::new();
