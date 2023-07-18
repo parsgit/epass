@@ -1,0 +1,7 @@
+services:
+  rust_app:
+    container_name: epass
+    build: .
+    volumes:
+      - ./:/app
+    tty: true
