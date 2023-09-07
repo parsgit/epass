@@ -11,6 +11,17 @@ The software uses an advanced AES256 encryption algorithm to protect the stored 
 - Creating encrypted backup copies
 - Restoring backup copies
 
+<br>
+
+### [Download MacOS version](https://github.com/parsgit/epass/releases/download/1.0.6/epass_1.0.6_x86_64-apple-darwin.zip)
+
+### [Download Windows version](https://github.com/parsgit/epass/releases/download/1.0.6/epass_1.0.6_x86_64-pc-windows-gnu.zip)
+
+### [Download Linux version](https://github.com/parsgit/epass/releases/download/1.0.6/epass_1.0.6_x86_64-unknown-linux-musl.tar.gz)
+
+<br>
+
+
 ## About Export :
 
 When you choose the export option, a backup file is created containing all your encrypted passwords. This backup file is also encrypted again using the AES256 algorithm and to encrypt this backup version, we use a 30-character hash of your original password as the key.
@@ -18,12 +29,5 @@ This ensures that even if someone gains access to your backup file, they won't b
 
 However, in any case, you should never expose your sensitive files to the public or leave them unsecured where others may find them. It is always recommended to take necessary precautions such as storing backups in a secure location and using strong passwords to protect your important data.
 
-This program consists of binary files that are available for download on Linux and Windows operating systems.
-
-## [Download MacOS version](https://github.com/parsgit/epass/releases/download/1.0.6/epass_1.0.6_x86_64-apple-darwin.zip)
-
-## [Download Windows version](https://github.com/parsgit/epass/releases/download/1.0.6/epass_1.0.6_x86_64-pc-windows-gnu.zip)
-
-## [Download Linux version](https://github.com/parsgit/epass/releases/download/1.0.6/epass_1.0.6_x86_64-unknown-linux-musl.tar.gz)
 
 
